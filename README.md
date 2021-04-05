@@ -60,11 +60,20 @@ You will need to install a certain version of clang to ensure ABI compatibility.
 git clone https://github.com/llvm/llvm-project.git
 cd llvm-project
 git checkout 96ef4f307df2
-mkdir build
-cd build
-cmake -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_PROJECTS="clang;libcxx;libcxxabi" -DCMAKE_BUILD_TYPE=release ../llvm
+
+mkdir build_clang
+cd build_clang
+cmake -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=release ../llvm
 ninja
-sudo path/to/ninja install
+sudo $(which ninja) install
+
+cd ..
+mkdir build_libcxx
+cd build_libcxx
+cmake -G Ninja -DCMAKE_C_COMPILER=/usr/local/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++ -DLLVM_ENABLE_PROJECTS="libcxx;libcxxabi" -DCMAKE_BUILD_TYPE=release ../llvm
+ninja
+sudo $(which ninja) install
+
 sudo ldconfig
 ```
 
