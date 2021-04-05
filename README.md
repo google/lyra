@@ -48,7 +48,12 @@ target.  The android target is optimized for realtime performance.  The linux
 target is typically used for development and debugging.
 
 You will also need to install some tools (which may already be on your system).
-You can install them with `sudo apt install ninja-build git cmake clang python`.
+You can install them with:
+
+```shell
+sudo apt update
+sudo apt install ninja-build git cmake clang python
+```
 
 ### Linux requirements
 
