@@ -21,7 +21,7 @@ features to recreate the speech signal.
 
 Lyra harnesses the power of new natural-sounding generative models to maintain
 the low bitrate of parametric codecs while achieving high quality, on par with
-state-of-the-art waveform codecs used in most streaming and communication
+state-of-the-art waveform codecs used in most streaming andb communication
 platforms today.
 
 Computational complexity is reduced by using a cheaper recurrent generative
@@ -259,7 +259,7 @@ the following interface:
 class LyraEncoder : public LyraEncoderInterface {
  public:
   static std::unique_ptr<LyraEncoder> Create(
-      int sample_rate_hz, int num_channels, int bitrate, bool enable_dtx,
+      int sample_rate_hz, int num_channels, int bit_rate, bool enable_dtx,
       const ghc::filesystem::path& model_path);
 
   absl::optional<std::vector<uint8_t>> Encode(
