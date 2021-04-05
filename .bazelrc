@@ -1,0 +1,39 @@
+# By default, the linux x86 platform is targeted.
+# To select the android ARM64 platform, build with `--config=android_arm64`
+#
+# Both platforms require an external toolchain (NDK or clang/libc++) that
+# needs setup by the user.  See README.md for instructions.
+
+build --crosstool_top=//toolchain:clang_suite
+build --cpu=k8
+
+# Use the default C++ toolchain to build the tools used during the
+# build.
+build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+
+# Android
+build:android_arm64 --cpu=arm64-v8a
+build:android_arm64 --fat_apk_cpu=arm64-v8a
+build:android_arm64 --crosstool_top=//external:android/crosstool
+build:android_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build:android_arm64 --linkopt=-lm
+build:android_arm64 --linkopt=-ldl
+build:android_arm64 --linkopt=-llog
+build:android_arm64 --linkopt=-landroid
+build:android_arm64 --cxxopt=-std=gnu++17
+# This is required for using command line flags on android.
+# It could be removed for the APK targets, but making it default since
+# it doesn't seem to affect the size.
+build:android_arm64 --cxxopt=-DABSL_FLAGS_STRIP_NAMES=0
+# The android toolchain seems to add debug symbols (-g) even in copt mode.
+# This seems like a bazel bug.
+# (see https://github.com/bazelbuild/bazel/issues/13264). Until this is
+# resolved, make optimized arguments default.
+# If debugging c++ code, you may want to remove this.
+build:android_arm64 --copt=-g0
+build:android_arm64 --copt=-Os
+# When building the demo apk Android has transative deps that need to be pulled
+# in.  The correct fix is probably to stop using gmaven_artifact() rules and
+# use rules_jvm_external.  After that, this might be removeable, and we can use
+# androidx and more recent deps instead of deprecated ones.
+build:android_arm64 --strict_java_deps=OFF
