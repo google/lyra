@@ -340,7 +340,7 @@ If there isn't a packet available, but samples still need to be generated,
 of samples.
 
 In those cases, the decoder might switch to a comfort noise generation mode,
-which can be checked using `is_confort_noise`.
+which can be checked using `is_comfort_noise`.
 
 The rest of the `LyraDecoder` methods are just getters for the different
 predetermined parameters.
