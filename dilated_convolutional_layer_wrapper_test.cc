@@ -132,7 +132,7 @@ TYPED_TEST(DilatedConvolutionalLayerWrapperTest,
   }
 }
 
-// For dialted convolutional layers, an output vector at time t is formed by
+// For dilated convolutional layers, an output vector at time t is formed by
 // a weighted sum of input vectors at t, t - |dilation|, ...,
 // t - |kernel_size| * |dilation|.
 //
