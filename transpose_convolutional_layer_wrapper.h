@@ -58,7 +58,7 @@ class TransposeConvolutionalLayerWrapper
     }
     if (params.skip_connection) {
       LOG(ERROR) << layer_prompt
-                 << "Transpose covolutional layer does not support "
+                 << "Transpose convolutional layer does not support "
                  << "skip connections.";
       return nullptr;
     }
