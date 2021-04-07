@@ -44,7 +44,7 @@ static constexpr char kPrefix[] = "lyra_";
 //   1. float: C++'s generic floating point.
 //   2. csrblocksparse::fixed16_type: a type that will be used in our Lyra
 //      implementation. See the build rule for
-//      audio/chromedia/lyra/codec:wavegru_model_impl.
+//      audio/chromemedia/lyra/codec:wavegru_model_impl.
 // Different types would require different tolerance, hence the template class
 // Tolerance below.
 template <typename WeightTypeKind>
