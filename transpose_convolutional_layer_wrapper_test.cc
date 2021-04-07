@@ -123,7 +123,7 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest, ResetDoesNothing) {
 //    [|kerenl_size| * |num_filters|, |length|]. So the weight matrix is of
 //    shape [|kerenl_size| * |num_filters|, |num_input_channels|].
 // 2. Combine the result of the matrix multiplication to form a matrix of shape
-//    [|stride| * |num_fitlers, |length|],
+//    [|stride| * |num_filters, |length|],
 // 3. Reshape to the final output shape [|num_filters|, |stride| * |length|].
 //
 // But currently we only support |kernel_size| == |stride|, so step 2 is
