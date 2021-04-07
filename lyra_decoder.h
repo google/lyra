@@ -75,7 +75,7 @@ class LyraDecoder : public LyraDecoderInterface {
   ///                    rate chosen at Create time, given that each packet
   ///                    contains 40ms of data.
   /// @return Vector of int16-formatted samples as long as there are enough
-  ///          remaining samples availble. Else it returns nullopt.
+  ///          remaining samples available. Else it returns nullopt.
   absl::optional<std::vector<int16_t>> DecodeSamples(int num_samples) override;
 
   /// Decodes audio in packet loss mode.
