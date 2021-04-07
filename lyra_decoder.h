@@ -62,7 +62,7 @@ class LyraDecoder : public LyraDecoderInterface {
   /// payload.
   ///
   /// If estimated features were added by |DecodePacketLoss| but not fully
-  /// decoded overwrites that esimated feature.
+  /// decoded overwrites that estimated feature.
   ///
   /// @param encoded Encoded packet as a span of bytes.
   /// @return True if the provided packet is a valid Lyra packet.
