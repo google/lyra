@@ -147,7 +147,7 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest, LayerLoadSucceeds) {
 TYPED_TEST(TransposeConvolutionalLayerWrapperTest,
            LayerLoadDynamicDimensionsSucceeds) {
   LayerParams dynamic_params = this->transpose_params_;
-  // Setting to zeros means to dynamically decide the dimenisons.
+  // Setting to zeros means to dynamically decide the dimensions.
   dynamic_params.num_input_channels = 0;
   dynamic_params.num_filters = 0;
   auto layer = LayerWrapperPeer<TypeParam>::Create(dynamic_params);
