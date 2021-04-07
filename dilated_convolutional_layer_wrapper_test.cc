@@ -138,7 +138,7 @@ TYPED_TEST(DilatedConvolutionalLayerWrapperTest,
 //
 // The input to the matrix multiplication is |kernel_size|  input vectors
 // stacked vertically (a total of |kernel_size| * |num_input_channels| rows),
-// each spacing |diilation| apart in time. The input buffer should keep
+// each spacing |dilation| apart in time. The input buffer should keep
 // |dilation| columns of these "stacked" input vectors around and cycle through
 // these columns. In summary, the input buffer is of shape
 // [|kernel_size| * |num_input_channels|, |dilation|].
