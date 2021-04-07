@@ -356,7 +356,7 @@ TEST_P(LyraDecoderTest, PlcSamplesStraddlePacketBoundary) {
       std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
       std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
 
-  // Step 1: Add a pacekt with N frames.
+  // Step 1: Add a packet with N frames.
   ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_zeros));
 
   // Step 2: Decode N - 1 complete frames.
