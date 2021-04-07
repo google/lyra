@@ -1,0 +1,30 @@
+on: [push, pull_request]
+
+jobs:
+  android-bin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: seanmiddleditch/gha-setup-ninja@v3
+      - run: bazel build -c opt :encoder_main --config=android_arm64
+      - run: bazel build -c opt :decoder_main --config=android_arm64
+
+  android-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: seanmiddleditch/gha-setup-ninja@v3
+      - name: Build Android app
+        run: bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v2
+        if: github.repository_owner == 'lyra'
+        with:
+          path: bazel-bin/android_example/lyra_android_example.apk
+      - name: Upload Android APK on release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: bazel-bin/android_example/lyra_android_example.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
