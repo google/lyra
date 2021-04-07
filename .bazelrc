@@ -32,7 +32,7 @@ build:android_arm64 --cxxopt=-DABSL_FLAGS_STRIP_NAMES=0
 # If debugging c++ code, you may want to remove this.
 build:android_arm64 --copt=-g0
 build:android_arm64 --copt=-Os
-# When building the demo apk Android has transative deps that need to be pulled
+# When building the demo apk Android has transitive deps that need to be pulled
 # in.  The correct fix is probably to stop using gmaven_artifact() rules and
 # use rules_jvm_external.  After that, this might be removeable, and we can use
 # androidx and more recent deps instead of deprecated ones.
