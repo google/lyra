@@ -541,7 +541,7 @@ TEST_P(LyraDecoderTest, ModelsTransitionsAndTriggerOverlap) {
       .Times(kNumPacketDecodes + 1)
       .WillRepeatedly(Return(mock_samples_));
 
-  // In Step 2, in order to account for the overalp, the generative model's
+  // In Step 2, in order to account for the overlap, the generative model's
   // AddFeatures() may be called one extra time using the estimated features.
   // This happens only if |num_frames_per_packet_| is 1. Otherwise there would
   // be enough leftover features from the previous packet to generate samples.
