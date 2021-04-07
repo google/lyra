@@ -553,7 +553,7 @@ TEST_P(LyraDecoderTest, ModelsTransitionsAndTriggerOverlap) {
 
   // CNG's AddFeatures() and GenerateSamples() are called |kNumLostPackets|
   // |kNumLostPackets| times in Step 2, as well as one extra time to account
-  // for the overlap when transitioning from CNG to the geneative model.
+  // for the overlap when transitioning from CNG to the generative model.
   auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
   EXPECT_CALL(*mock_comfort_noise_generator,
               AddFeatures(mock_estimated_features))
