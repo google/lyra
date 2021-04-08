@@ -5,7 +5,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: seanmiddleditch/gha-setup-ninja@16b940825621068d98711680b6c3ff92201f8fc0
       - run: bazel build -c opt :encoder_main --config=android_arm64
       - run: bazel build -c opt :decoder_main --config=android_arm64
 
@@ -13,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: seanmiddleditch/gha-setup-ninja@16b940825621068d98711680b6c3ff92201f8fc0
       - name: Build Android app
         run: bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
       - name: Upload Android APK
