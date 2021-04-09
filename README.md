@@ -47,7 +47,6 @@ version available in their application repositories, so make sure you are
 using the required version or newer. The latest version can be downloaded via
 [Github](https://github.com/bazelbuild/bazel/releases).
 
-
 Lyra can be built from linux using bazel for an arm android target, or a linux
 target.  The android target is optimized for realtime performance.  The linux
 target is typically used for development and debugging.
