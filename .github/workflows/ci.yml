@@ -14,3 +14,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build Android app
         run: bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+      - name: Upload Android APK as artifact
+        uses: actions/upload-artifact@v2
+        if: github.repository_owner == 'google'
+        with:
+          path: bazel-bin/android_example/lyra_android_example.apk
