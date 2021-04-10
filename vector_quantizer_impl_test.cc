@@ -24,11 +24,11 @@
 #include <vector>
 
 // placeholder for get runfiles header.
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "Eigen/Core"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
-#include "Eigen/Core"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 
@@ -93,8 +93,7 @@ class VectorQuantizerImplPeer {
 class VectorQuantizerImplTest : public testing::Test {
  public:
   VectorQuantizerImplTest()
-      : model_path_(ghc::filesystem::current_path() /
-                    "wavegru"),
+      : model_path_(ghc::filesystem::current_path() / "wavegru"),
         quantizer_(VectorQuantizerImplPeer::Create(
             mean_vector_, transformation_matrix_, flattened_code_vectors_,
             codebook_dimensions_)) {}

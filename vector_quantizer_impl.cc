@@ -22,12 +22,12 @@
 #include <string>
 #include <vector>
 
-#include "audio/dsp/signal_vector_util.h"
-#include "glog/logging.h"
+#include "Eigen/LU"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/types/optional.h"
-#include "Eigen/LU"
+#include "audio/dsp/signal_vector_util.h"
+#include "glog/logging.h"
 #include "include/ghc/filesystem.hpp"
 #include "sparse_inference_matrixvector.h"
 
@@ -86,7 +86,6 @@ std::unique_ptr<VectorQuantizerImpl> VectorQuantizerImpl::Create(
                << "exceeds the compile-time maximum " << kMaxNumQuantizedBits;
     return nullptr;
   }
-
 
   std::vector<float> flat_transformation_matrix_array;
   status = csrblocksparse::ReadArrayFromFile(kPrefix + "transmat.gz",
@@ -196,7 +195,6 @@ VectorQuantizerImpl::VectorQuantizerImpl(
       inverse_transformation_matrix_(transformation_matrix.inverse()),
       codebooks_(codebooks) {}
 
-
 absl::optional<std::string> VectorQuantizerImpl::Quantize(
     const std::vector<float>& features) const {
   if (features.size() != num_features_) {
@@ -288,7 +286,6 @@ std::vector<float> VectorQuantizerImpl::DecodeToLossyFeatures(
 
   return std::vector<float>(features.data(), features.data() + features.size());
 }
-
 
 int VectorQuantizerImpl::FindNearest(
     const Eigen::RowVectorXf& sub_projected_features,

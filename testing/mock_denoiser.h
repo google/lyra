@@ -20,10 +20,10 @@
 #include <cstdint>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "denoiser_interface.h"
+#include "gmock/gmock.h"
 
 namespace chromemedia {
 namespace codec {

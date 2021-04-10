@@ -31,7 +31,6 @@ TEST(SparseInferenceTest, ScalarSample) {
   const std::minstd_rand::result_type kSeed = 42;
   std::minstd_rand gen{std::minstd_rand(kSeed)};
 
-
   csrblocksparse::CacheAlignedVector<float> mat =
       csrblocksparse::CacheAlignedVector<float>(kOutputBins);
   mat.ScalarSample(1.0, &gen, &scratch_space);

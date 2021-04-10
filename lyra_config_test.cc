@@ -21,7 +21,7 @@ namespace codec {
 namespace {
 
 TEST(LyraConfigTest, TestGetVersionString) {
-  const std::string &version = GetVersionString();
+  const std::string& version = GetVersionString();
 
   // Parse the period-separated version components.
   std::istringstream version_stream(version);

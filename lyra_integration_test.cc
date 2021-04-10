@@ -22,13 +22,13 @@
 
 #include "glog/logging.h"
 // placeholder for get runfiles header.
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "dsp_util.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "include/ghc/filesystem.hpp"
 #include "log_mel_spectrogram_extractor_impl.h"
 #include "lyra_config.h"
 #include "lyra_decoder.h"
@@ -47,15 +47,12 @@ class LyraIntegrationTest : public testing::TestWithParam<absl::string_view> {};
 
 // This tests that decoded audio has similar features as the original.
 TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
-  const ghc::filesystem::path wav_dir(
-      "testdata");
+  const ghc::filesystem::path wav_dir("testdata");
   const auto model_path =
-      ghc::filesystem::current_path() /
-      std::string("wavegru");
+      ghc::filesystem::current_path() / std::string("wavegru");
 
   const auto input_path =
-      ghc::filesystem::current_path() / wav_dir /
-      std::string(GetParam());
+      ghc::filesystem::current_path() / wav_dir / std::string(GetParam());
   absl::StatusOr<ReadWavResult> input_wav_result =
       Read16BitWavFileToVector(input_path);
   CHECK(input_wav_result.ok());
@@ -141,8 +138,7 @@ TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
 
     absl::optional<std::vector<float>> decoded_features_or =
         decoded_extractor->Extract(absl::MakeConstSpan(
-            &decoded.at(frame * num_samples_per_hop),
-            num_samples_per_hop));
+            &decoded.at(frame * num_samples_per_hop), num_samples_per_hop));
     ASSERT_TRUE(decoded_features_or.has_value());
     EXPECT_THAT(decoded_features_or,
                 testing::Optional(testing::SizeIs(kNumFeatures)));

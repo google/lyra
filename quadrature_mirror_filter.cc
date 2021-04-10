@@ -17,11 +17,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "audio/linear_filters/biquad_filter.h"
 #include "audio/linear_filters/biquad_filter_coefficients.h"
-#include "glog/logging.h"
-#include "absl/types/span.h"
 #include "dsp_util.h"
+#include "glog/logging.h"
 
 namespace chromemedia {
 namespace codec {

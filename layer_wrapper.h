@@ -23,8 +23,8 @@
 #include <variant>
 #include <vector>
 
-#include "glog/logging.h"
 #include "dsp_util.h"
+#include "glog/logging.h"
 #include "layer_wrapper_interface.h"
 #include "sparse_inference_matrixvector.h"
 

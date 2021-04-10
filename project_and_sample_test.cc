@@ -21,11 +21,11 @@
 #include <vector>
 
 // placeholder for get runfiles header.
+#include "absl/strings/str_format.h"
+#include "exported_layers_test.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/strings/str_format.h"
 #include "include/ghc/filesystem.hpp"
-#include "exported_layers_test.h"
 #include "lyra_types.h"
 #include "sparse_inference_matrixvector.h"
 
@@ -84,8 +84,7 @@ class ProjectAndSampleTest : public ::testing::Test {
       : project_and_sample_layer_(),
         gru_hiddens_(kTestNumGruHiddens, static_cast<ProjRhsType>(0.5f)),
         gru_hiddens_view_(gru_hiddens_.data(), kTestNumGruHiddens, 1),
-        testdata_dir_(ghc::filesystem::current_path() /
-                      "testdata"),
+        testdata_dir_(ghc::filesystem::current_path() / "testdata"),
         scratch_space_(kExpandedMixesSize) {}
 
  protected:

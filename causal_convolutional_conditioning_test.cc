@@ -20,11 +20,11 @@
 #include <vector>
 
 // placeholder for get runfiles header.
+#include "absl/types/span.h"
+#include "exported_layers_test.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/types/span.h"
 #include "include/ghc/filesystem.hpp"
-#include "exported_layers_test.h"
 #include "lyra_config.h"
 #include "lyra_types.h"
 #include "sparse_inference_matrixvector.h"
@@ -149,8 +149,7 @@ template <typename ComputeType>
 class CausalConvolutionalConditioningTest : public ::testing::Test {
  public:
   CausalConvolutionalConditioningTest()
-      : testdata_dir_(ghc::filesystem::current_path() /
-                      "testdata") {}
+      : testdata_dir_(ghc::filesystem::current_path() / "testdata") {}
 
  protected:
   const float kTolerance = Tolerance<ComputeType>::kTolerance;

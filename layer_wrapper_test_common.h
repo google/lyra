@@ -22,9 +22,9 @@
 #include <utility>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/memory/memory.h"
 #include "layer_wrappers_lib.h"
 #include "sparse_inference_matrixvector.h"
 

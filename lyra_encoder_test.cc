@@ -27,14 +27,14 @@
 #include <vector>
 
 // placeholder for get runfiles header.
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include "absl/memory/memory.h"  // IWYU pragma: keep
+#include "absl/memory/memory.h"   // IWYU pragma: keep
 #include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "denoiser_interface.h"
 #include "feature_extractor_interface.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "noise_estimator_interface.h"
 #include "packet.h"
@@ -87,7 +87,6 @@ class LyraEncoderPeer {
  private:
   LyraEncoder encoder_;
 };
-
 
 namespace {
 
@@ -447,9 +446,7 @@ TEST_P(LyraEncoderTest, MultipleEncodeCalls) {
 }
 
 TEST_P(LyraEncoderTest, GoodCreationParametersReturnNotNullptr) {
-  const auto valid_model_path =
-      ghc::filesystem::current_path() /
-      "wavegru";
+  const auto valid_model_path = ghc::filesystem::current_path() / "wavegru";
 
   EXPECT_NE(nullptr,
             LyraEncoder::Create(sample_rate_hz_, kNumChannels, kBitrate,
@@ -460,9 +457,7 @@ TEST_P(LyraEncoderTest, GoodCreationParametersReturnNotNullptr) {
 }
 
 TEST_P(LyraEncoderTest, BadCreationParametersReturnNullptr) {
-  const auto valid_model_path =
-      ghc::filesystem::current_path() /
-      "wavegru";
+  const auto valid_model_path = ghc::filesystem::current_path() / "wavegru";
 
   EXPECT_EQ(nullptr,
             LyraEncoder::Create(0, kNumChannels, kBitrate,

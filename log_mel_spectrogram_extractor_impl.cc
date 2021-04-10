@@ -22,12 +22,12 @@
 #include <utility>
 #include <vector>
 
+#include "absl/memory/memory.h"
+#include "absl/types/span.h"
 #include "audio/dsp/mfcc/mel_filterbank.h"
 #include "audio/dsp/number_util.h"
 #include "audio/dsp/spectrogram/spectrogram.h"
 #include "glog/logging.h"
-#include "absl/memory/memory.h"
-#include "absl/types/span.h"
 
 namespace chromemedia {
 namespace codec {

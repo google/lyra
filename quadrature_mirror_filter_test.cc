@@ -30,11 +30,16 @@ constexpr int kNumBands = 2;
 constexpr int kNumBandSamples = 320;
 constexpr int kNumSignalSamples = kNumBands * kNumBandSamples;
 
-template <typename T> double MaxFactor();
-template<> double MaxFactor<int16_t>(){
-    return std::pow(std::numeric_limits<int16_t>().max(), 2.f);
+template <typename T>
+double MaxFactor();
+template <>
+double MaxFactor<int16_t>() {
+  return std::pow(std::numeric_limits<int16_t>().max(), 2.f);
 }
-template<> double MaxFactor<float>() { return 1; }
+template <>
+double MaxFactor<float>() {
+  return 1;
+}
 
 struct MaxCorrelation {
   float correlation;

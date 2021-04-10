@@ -17,8 +17,8 @@
 #ifndef LYRA_CODEC_SPARSE_INFERENCE_MATRIXVECTOR_H_
 #define LYRA_CODEC_SPARSE_INFERENCE_MATRIXVECTOR_H_
 
-#include "glog/logging.h"
 #include "absl/status/status.h"
+#include "glog/logging.h"
 
 // [internal] Start of sparse_inference_matrixvector declarations.
 
@@ -674,7 +674,7 @@ class GruGates<fixed16<kGruStateBits>, fixed32<kInputBits>,
   static constexpr int kSIMDWidth = kNeonSIMDWidth;
 #elif defined __AVX2__
   static constexpr int kSIMDWidth = kAVX2SIMDWidth * 2;
-#else  // Generic case.
+#else   // Generic case.
   static constexpr int kSIMDWidth = kGenericSIMDWidth;
 #endif  // __ARM_NEON || defined __aarch64__ / __AVX2__
 

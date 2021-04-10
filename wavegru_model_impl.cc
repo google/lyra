@@ -22,10 +22,10 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
-#include "include/ghc/filesystem.hpp"
 #include "buffer_merger.h"
 #include "causal_convolutional_conditioning.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_wavegru.h"
 #include "sparse_inference_matrixvector.h"
 // IWYU pragma: no_include "speech/greco3/core/thread.h"
@@ -128,7 +128,7 @@ absl::optional<std::vector<int16_t>> WavegruModelImpl::GenerateSamples(
     for (int tid = 1; tid < num_threads_; ++tid) {
       auto f = [&, tid]() {
         wavegru_->SampleThreaded(tid, conditioning_.get(),
-                                  &model_split_samples_, 0);
+                                 &model_split_samples_, 0);
       };
       background_threads_.emplace_back(
           absl::make_unique<csrblocksparse::Thread>(f));

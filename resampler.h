@@ -21,8 +21,8 @@
 #include <memory>
 #include <vector>
 
-#include "audio/dsp/resampler_q.h"
 #include "absl/types/span.h"
+#include "audio/dsp/resampler_q.h"
 #include "resampler_interface.h"
 
 namespace chromemedia {
