@@ -24,13 +24,13 @@ namespace {
 
 TEST(NoOpPreprocessorTest, IntOutputIsCopy) {
   static constexpr int kNumSamples = 640;
-  static constexpr int kSampeRateHz = 16000;
+  static constexpr int kSampleRateHz = 16000;
   std::vector<int16_t> input(kNumSamples);
   std::iota(input.begin(), input.end(), -100);
 
   NoOpPreprocessor no_op_preprocessor;
   std::vector<int16_t> output = no_op_preprocessor.Process(
-      absl::MakeConstSpan(input.data(), input.size()), kSampeRateHz);
+      absl::MakeConstSpan(input.data(), input.size()), kSampleRateHz);
   ASSERT_EQ(input, output);
 }
 

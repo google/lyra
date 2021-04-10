@@ -120,10 +120,10 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest, ResetDoesNothing) {
 //
 // This is achieved by:
 // 1. Map input of shape [|num_input_channels|, |length|] to output of shape
-//    [|kerenl_size| * |num_filters|, |length|]. So the weight matrix is of
-//    shape [|kerenl_size| * |num_filters|, |num_input_channels|].
+//    [|kernel_size| * |num_filters|, |length|]. So the weight matrix is of
+//    shape [|kernel_size| * |num_filters|, |num_input_channels|].
 // 2. Combine the result of the matrix multiplication to form a matrix of shape
-//    [|stride| * |num_fitlers, |length|],
+//    [|stride| * |num_filters, |length|],
 // 3. Reshape to the final output shape [|num_filters|, |stride| * |length|].
 //
 // But currently we only support |kernel_size| == |stride|, so step 2 is
@@ -134,7 +134,7 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest, LayerLoadSucceeds) {
   EXPECT_GE(layer->bytes(), 0);
 
   // Verify that the weight matrix's shape is
-  // [|kerenl_size| * |num_filters|, |num_input_channels|].
+  // [|kernel_size| * |num_filters|, |num_input_channels|].
   EXPECT_EQ(layer->rows(), params.kernel_size * params.num_filters);
   EXPECT_EQ(layer->cols(), params.num_input_channels);
 
@@ -147,14 +147,14 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest, LayerLoadSucceeds) {
 TYPED_TEST(TransposeConvolutionalLayerWrapperTest,
            LayerLoadDynamicDimensionsSucceeds) {
   LayerParams dynamic_params = this->transpose_params_;
-  // Setting to zeros means to dynamically decide the dimenisons.
+  // Setting to zeros means to dynamically decide the dimensions.
   dynamic_params.num_input_channels = 0;
   dynamic_params.num_filters = 0;
   auto layer = LayerWrapperPeer<TypeParam>::Create(dynamic_params);
   EXPECT_GE(layer->bytes(), 0);
 
   // Verify that the weight matrix's shape is
-  // [|kerenl_size| * |num_filters|, |num_input_channels|] of the original
+  // [|kernel_size| * |num_filters|, |num_input_channels|] of the original
   // non-zero params.
   const auto params = this->transpose_params_;
   EXPECT_EQ(layer->rows(), params.kernel_size * params.num_filters);
@@ -178,7 +178,7 @@ TYPED_TEST(TransposeConvolutionalLayerWrapperTest,
   EXPECT_GE(layer->bytes(), 0);
 
   // Verify that the weight matrix's shape is
-  // [|kerenl_size| * |num_filters|, |num_input_channels|].
+  // [|kernel_size| * |num_filters|, |num_input_channels|].
   EXPECT_EQ(layer->rows(), params.kernel_size * params.num_filters);
   EXPECT_EQ(layer->cols(), params.num_input_channels);
 

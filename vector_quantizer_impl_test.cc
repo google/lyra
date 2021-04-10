@@ -132,7 +132,7 @@ TEST_F(VectorQuantizerImplTest, CodebookWithWrongTotalDimensionalityFails) {
   const std::vector<int16_t> invalid_codebook_dimensions = {
       // 1 vector of dimension 2.
       1, 2,
-      // 4 vectors of dimnesion 1, making the total dimensionality defined
+      // 4 vectors of dimension 1, making the total dimensionality defined
       // by the codebook to be 3, which is not the same as the number of
       // features (4).
       4, 1};
@@ -151,7 +151,7 @@ TEST_F(VectorQuantizerImplTest, CodebookWithNoElementsCreateFails) {
   const std::vector<int16_t> invalid_codebook_dimensions = {
       // 1 vector of dimension 2.
       1, 2,
-      // 0 vector of dimnesion 2.
+      // 0 vector of dimension 2.
       0, 2};
 
   EXPECT_EQ(nullptr,

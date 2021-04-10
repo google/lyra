@@ -154,7 +154,7 @@ class DilatedConvolutionalLayerWrapper
         num_elements_per_thread_(output_rows / num_threads),
         skip_connection_buffer_(output_rows, 1) {}
 
-  // For dilated convolutional layers, the matrix multilication needs inputs
+  // For dilated convolutional layers, the matrix multiplication needs inputs
   // from t, t - |dilation|, ..., t - |kernel_size| * |dilation|.
   // In a layer where |kernel_size| = 2 and |dilation| = 4, the memory layout of
   // |input_buffer_| is stacks of |kernel_size| vectors, each having

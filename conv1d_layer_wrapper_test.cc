@@ -186,7 +186,7 @@ TYPED_TEST(Conv1DLayerWrapperTest, LayerLoadSucceeds) {
 TYPED_TEST(Conv1DLayerWrapperTest, LayerLoadDynamicDimensionsSucceeds) {
   LayerParams dynamic_params = this->conv1d_params_;
 
-  // Setting to zeros means to dynamically decide the dimenisons.
+  // Setting to zeros means to dynamically decide the dimensions.
   dynamic_params.num_input_channels = 0;
   dynamic_params.num_filters = 0;
   auto layer = LayerWrapperPeer<TypeParam>::Create(dynamic_params);

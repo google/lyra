@@ -356,7 +356,7 @@ TEST_P(LyraDecoderTest, PlcSamplesStraddlePacketBoundary) {
       std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
       std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
 
-  // Step 1: Add a pacekt with N frames.
+  // Step 1: Add a packet with N frames.
   ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_zeros));
 
   // Step 2: Decode N - 1 complete frames.
@@ -541,7 +541,7 @@ TEST_P(LyraDecoderTest, ModelsTransitionsAndTriggerOverlap) {
       .Times(kNumPacketDecodes + 1)
       .WillRepeatedly(Return(mock_samples_));
 
-  // In Step 2, in order to account for the overalp, the generative model's
+  // In Step 2, in order to account for the overlap, the generative model's
   // AddFeatures() may be called one extra time using the estimated features.
   // This happens only if |num_frames_per_packet_| is 1. Otherwise there would
   // be enough leftover features from the previous packet to generate samples.
@@ -553,7 +553,7 @@ TEST_P(LyraDecoderTest, ModelsTransitionsAndTriggerOverlap) {
 
   // CNG's AddFeatures() and GenerateSamples() are called |kNumLostPackets|
   // |kNumLostPackets| times in Step 2, as well as one extra time to account
-  // for the overlap when transitioning from CNG to the geneative model.
+  // for the overlap when transitioning from CNG to the generative model.
   auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
   EXPECT_CALL(*mock_comfort_noise_generator,
               AddFeatures(mock_estimated_features))
