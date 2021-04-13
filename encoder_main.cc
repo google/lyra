@@ -35,7 +35,7 @@ ABSL_FLAG(bool, enable_preprocessing, false,
           "If enabled runs the input signal through the preprocessing "
           "module before encoding.");
 ABSL_FLAG(bool, enable_dtx, false,
-          "Enables discontinuous tranmission (DTX). DTX does not send packets "
+          "Enables discontinuous transmission (DTX). DTX does not send packets "
           "when noise is detected.");
 ABSL_FLAG(
     std::string, model_path, "wavegru",

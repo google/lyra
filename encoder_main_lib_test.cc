@@ -79,9 +79,9 @@ TEST_F(EncoderMainLibTest, WavFileNotFound) {
 
 TEST_F(EncoderMainLibTest, EncodeSingleWavFiles) {
   for (const auto wav_file : kWavFiles) {
-    const auto kInputWavpath = (testdata_dir_ / wav_file).concat(".wav");
+    const auto kInputWavepath = (testdata_dir_ / wav_file).concat(".wav");
     const auto kOutputEncoded = (output_dir_ / wav_file).concat(".lyra");
-    EXPECT_TRUE(EncodeFile(kInputWavpath, kOutputEncoded,
+    EXPECT_TRUE(EncodeFile(kInputWavepath, kOutputEncoded,
                            /*enable_preprocessing=*/false,
                            /*enable_dtx=*/false, model_path_));
   }

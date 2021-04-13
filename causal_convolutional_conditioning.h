@@ -129,12 +129,12 @@ class CausalConvolutionalConditioning {
   absl::Span<OutputType> AtStep(int step) {
     const int samples_per_cond_output =
         num_samples_per_hop_ / kCondUpsamplingRatio;
-    const int conditioining_column =
+    const int conditioning_column =
         (step % (num_frames_per_packet_ * num_samples_per_hop_)) /
         samples_per_cond_output;
     const int num_output_elements = 3 * num_hiddens_;
     return absl::Span<OutputType>(
-        conditioning_.data() + conditioining_column * num_output_elements,
+        conditioning_.data() + conditioning_column * num_output_elements,
         num_output_elements);
   }
 

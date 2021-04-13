@@ -42,7 +42,7 @@ namespace codec {
 
 /// Lyra encoder class.
 ///
-/// This class encodes audio by extacting features and performing vector
+/// This class encodes audio by extracting features and performing vector
 /// quantization.
 class LyraEncoder : public LyraEncoderInterface {
  public:

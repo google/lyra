@@ -132,13 +132,13 @@ TYPED_TEST(DilatedConvolutionalLayerWrapperTest,
   }
 }
 
-// For dialted convolutional layers, an output vector at time t is formed by
+// For dilated convolutional layers, an output vector at time t is formed by
 // a weighted sum of input vectors at t, t - |dilation|, ...,
 // t - |kernel_size| * |dilation|.
 //
 // The input to the matrix multiplication is |kernel_size|  input vectors
 // stacked vertically (a total of |kernel_size| * |num_input_channels| rows),
-// each spacing |diilation| apart in time. The input buffer should keep
+// each spacing |dilation| apart in time. The input buffer should keep
 // |dilation| columns of these "stacked" input vectors around and cycle through
 // these columns. In summary, the input buffer is of shape
 // [|kernel_size| * |num_input_channels|, |dilation|].
@@ -172,7 +172,7 @@ TYPED_TEST(DilatedConvolutionalLayerWrapperTest,
            LayerLoadDynamicDimensionsSucceeds) {
   LayerParams dynamic_params = this->dilated_params_;
 
-  // Setting to zeros means to dynamically decide the dimenisons.
+  // Setting to zeros means to dynamically decide the dimensions.
   dynamic_params.num_input_channels = 0;
   dynamic_params.num_filters = 0;
   auto layer = LayerWrapperPeer<TypeParam>::Create(dynamic_params);

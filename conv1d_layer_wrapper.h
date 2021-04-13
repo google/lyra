@@ -132,7 +132,7 @@ class Conv1DLayerWrapper
   //  | v1 |                             //
   //
   // On the other hand, If |stride| = 2, then after the first loading, which
-  // pushes in v0 and v1. Calling Reset() would move them two stackes up (and
+  // pushes in v0 and v1. Calling Reset() would move them two stacks up (and
   // pushing v0 out), and the buffer looks like this:
   //
   //  | v1 |                             //
