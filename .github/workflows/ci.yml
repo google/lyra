@@ -19,3 +19,4 @@ jobs:
         if: github.repository_owner == 'google'
         with:
           path: bazel-bin/android_example/lyra_android_example.apk
+          retention-days: 30
