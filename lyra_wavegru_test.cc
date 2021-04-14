@@ -23,8 +23,8 @@
 #endif  // !defined(USE_FIXED16) && !defined(USE_BFLOAT16)
 
 // placeholder for get runfiles header.
-#include "gtest/gtest.h"
 #include "absl/strings/str_format.h"
+#include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "sparse_inference_matrixvector.h"  // IWYU pragma: keep
@@ -51,8 +51,7 @@ class LyraWavegruTest
       : sample_rate_hz_(GetInternalSampleRate(std::get<1>(GetParam()))),
         lyra_wavegru_(LyraWavegru<ComputeType>::Create(
             std::get<0>(GetParam()),
-            ghc::filesystem::current_path() /
-                "wavegru",
+            ghc::filesystem::current_path() / "wavegru",
             absl::StrFormat(kPrefixTemplate, sample_rate_hz_ / 1000))) {}
 
   const int sample_rate_hz_;

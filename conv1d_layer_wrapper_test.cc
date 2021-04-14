@@ -36,8 +36,7 @@ template <typename ComputeType>
 class Conv1DLayerWrapperTest : public ::testing::Test {
  public:
   Conv1DLayerWrapperTest()
-      : testdata_dir_(ghc::filesystem::current_path() /
-                      "testdata"),
+      : testdata_dir_(ghc::filesystem::current_path() / "testdata"),
         conv1d_params_{.num_input_channels = kFeatureDepth,
                        .num_filters = kNumCondHidden,
                        .length = 1,

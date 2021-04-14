@@ -21,17 +21,17 @@
 #include <utility>
 #include <vector>
 
-#include "audio/linear_filters/biquad_filter.h"
-#include "audio/linear_filters/biquad_filter_coefficients.h"
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
+#include "audio/linear_filters/biquad_filter.h"
+#include "audio/linear_filters/biquad_filter_coefficients.h"
 #include "denoiser_interface.h"
 #include "dsp_util.h"
 #include "feature_extractor_interface.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_components.h"
 #include "lyra_config.h"
 #include "noise_estimator.h"

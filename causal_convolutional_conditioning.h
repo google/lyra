@@ -20,11 +20,11 @@
 #include <memory>
 #include <string>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_format.h"
 #include "absl/types/span.h"
 #include "dsp_util.h"
+#include "glog/logging.h"
 #include "layer_wrappers_lib.h"
 #include "lyra_types.h"
 #include "sparse_inference_matrixvector.h"

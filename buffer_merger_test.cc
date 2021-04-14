@@ -23,10 +23,10 @@
 #include <utility>
 #include <vector>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/memory/memory.h"
 #include "filter_banks_interface.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "lyra_config.h"
 #include "testing/mock_filter_banks.h"
 

@@ -28,7 +28,6 @@
 namespace chromemedia {
 namespace codec {
 
-
 // Decodes a vector of bytes into wav data.
 bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
                     float packet_loss_rate, float average_burst_length,

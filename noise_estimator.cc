@@ -21,10 +21,10 @@
 #include <numeric>
 #include <vector>
 
-#include "audio/dsp/signal_vector_util.h"
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/types/optional.h"
+#include "audio/dsp/signal_vector_util.h"
+#include "glog/logging.h"
 #include "log_mel_spectrogram_extractor_impl.h"
 
 namespace chromemedia {

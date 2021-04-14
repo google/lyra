@@ -25,13 +25,13 @@
 #include <string>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "gilbert_model.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "lyra_decoder.h"
 #include "wav_util.h"
@@ -48,7 +48,6 @@ int PacketSize(LyraDecoder* decoder) {
 }
 
 }  // namespace
-
 
 bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
                     float packet_loss_rate, float average_burst_length,
@@ -95,8 +94,8 @@ bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
 
   const auto elapsed = absl::Now() - benchmark_start;
   LOG(INFO) << "Elapsed seconds : " << absl::ToInt64Seconds(elapsed);
-  LOG(INFO) << "Samples per second : " <<
-      decoded_audio->size() / absl::ToDoubleSeconds(elapsed);
+  LOG(INFO) << "Samples per second : "
+            << decoded_audio->size() / absl::ToDoubleSeconds(elapsed);
   return true;
 }
 

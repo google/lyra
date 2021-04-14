@@ -21,9 +21,9 @@
 #include <memory>
 #include <vector>
 
+#include "absl/types/optional.h"
 #include "audio/dsp/mfcc/mel_filterbank.h"
 #include "audio/dsp/spectrogram/inverse_spectrogram.h"
-#include "absl/types/optional.h"
 #include "generative_model_interface.h"
 
 namespace chromemedia {

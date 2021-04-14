@@ -37,8 +37,7 @@ template <typename ComputeType>
 class DilatedConvolutionalLayerWrapperTest : public ::testing::Test {
  public:
   DilatedConvolutionalLayerWrapperTest()
-      : testdata_dir_(ghc::filesystem::current_path() /
-                      "testdata"),
+      : testdata_dir_(ghc::filesystem::current_path() / "testdata"),
         dilated_params_{.num_input_channels = kNumCondHidden,
                         .num_filters = kNumCondHidden,
                         .length = 1,

@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "absl/types/span.h"
+#include "gmock/gmock.h"
 #include "resampler_interface.h"
 
 namespace chromemedia {

@@ -44,12 +44,12 @@ class SplitFilter {
   explicit SplitFilter(int num_bands);
 
   const int num_bands_;
-  std::vector <
-      std::vector<SplitQuadratureMirrorFilter<int16_t>>> filters_per_level_;
+  std::vector<std::vector<SplitQuadratureMirrorFilter<int16_t>>>
+      filters_per_level_;
 };
 
 // Filter bank to merge multiple bands sampled at sub-Nyquist into signal.
-class MergeFilter : public MergeFilterInterface{
+class MergeFilter : public MergeFilterInterface {
  public:
   // Create a MergeFilter. Return nullptr if num_bands isn't a power of 2.
   static std::unique_ptr<MergeFilter> Create(int num_bands);
@@ -62,8 +62,8 @@ class MergeFilter : public MergeFilterInterface{
  private:
   explicit MergeFilter(int num_bands);
 
-  std::vector <
-      std::vector<MergeQuadratureMirrorFilter<int16_t>>> filters_per_level_;
+  std::vector<std::vector<MergeQuadratureMirrorFilter<int16_t>>>
+      filters_per_level_;
 };
 
 }  // namespace codec

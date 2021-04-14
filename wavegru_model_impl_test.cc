@@ -34,8 +34,7 @@ class WavegruModelImplTest : public testing::Test {
       : num_samples_per_hop_(GetNumSamplesPerHop(kInternalSampleRateHz)),
         model_(WavegruModelImpl::Create(
             num_samples_per_hop_, kNumFeatures, kNumFramesPerPacket,
-            ghc::filesystem::current_path() /
-                "wavegru")) {}
+            ghc::filesystem::current_path() / "wavegru")) {}
   const int num_samples_per_hop_;
   std::unique_ptr<WavegruModelImpl> model_;
 };

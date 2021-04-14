@@ -22,14 +22,14 @@
 #include <utility>
 #include <vector>
 
-#include "audio/dsp/mfcc/mel_filterbank.h"
-#include "audio/dsp/number_util.h"
-#include "audio/dsp/spectrogram/inverse_spectrogram.h"
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/random/random.h"
 #include "absl/types/optional.h"
+#include "audio/dsp/mfcc/mel_filterbank.h"
+#include "audio/dsp/number_util.h"
+#include "audio/dsp/spectrogram/inverse_spectrogram.h"
 #include "dsp_util.h"
+#include "glog/logging.h"
 #include "log_mel_spectrogram_extractor_impl.h"
 
 #ifdef BENCHMARK

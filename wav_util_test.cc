@@ -16,9 +16,9 @@
 
 // placeholder for get runfiles header.
 // placeholder for testing header.
-#include "gtest/gtest.h"
 #include "absl/flags/flag.h"
 #include "absl/status/statusor.h"
+#include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 
 namespace chromemedia::codec {
@@ -31,8 +31,7 @@ class WavUtilTest : public testing::Test {
   // std::string_view.
   absl::StatusOr<ReadWavResult> ReadWav(const std::string& file_name) {
     const ghc::filesystem::path wav_path =
-        ghc::filesystem::current_path() /
-        "testdata" / file_name;
+        ghc::filesystem::current_path() / "testdata" / file_name;
     return Read16BitWavFileToVector(wav_path.string());
   }
 };

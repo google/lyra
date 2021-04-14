@@ -19,10 +19,10 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "filter_banks_interface.h"
+#include "glog/logging.h"
 #include "quadrature_mirror_filter.h"
 
 namespace chromemedia {

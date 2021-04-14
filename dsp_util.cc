@@ -20,9 +20,9 @@
 #include <limits>
 #include <optional>
 
+#include "absl/types/span.h"
 #include "audio/dsp/signal_vector_util.h"
 #include "glog/logging.h"
-#include "absl/types/span.h"
 
 namespace chromemedia {
 namespace codec {
