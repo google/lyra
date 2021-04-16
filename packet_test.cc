@@ -72,9 +72,9 @@ TEST_F(PacketTest, UnpackVariableHeader) {
 
   // Create packet with header set to 0s, bits set to 1s.
   std::vector<uint8_t> encoded = {
-    0b00011111,
-    0b11111111,
-    0b11100000,
+      0b00011111,
+      0b11111111,
+      0b11100000,
   };
   std::bitset<kNumQuantizedBitsTest> expected_bits("1111111111111111");
 

@@ -87,7 +87,6 @@ std::unique_ptr<VectorQuantizerImpl> VectorQuantizerImpl::Create(
     return nullptr;
   }
 
-
   std::vector<float> flat_transformation_matrix_array;
   status = csrblocksparse::ReadArrayFromFile(kPrefix + "transmat.gz",
                                              &flat_transformation_matrix_array,
@@ -196,7 +195,6 @@ VectorQuantizerImpl::VectorQuantizerImpl(
       inverse_transformation_matrix_(transformation_matrix.inverse()),
       codebooks_(codebooks) {}
 
-
 absl::optional<std::string> VectorQuantizerImpl::Quantize(
     const std::vector<float>& features) const {
   if (features.size() != num_features_) {
@@ -288,7 +286,6 @@ std::vector<float> VectorQuantizerImpl::DecodeToLossyFeatures(
 
   return std::vector<float>(features.data(), features.data() + features.size());
 }
-
 
 int VectorQuantizerImpl::FindNearest(
     const Eigen::RowVectorXf& sub_projected_features,

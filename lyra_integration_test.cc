@@ -141,8 +141,7 @@ TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
 
     absl::optional<std::vector<float>> decoded_features_or =
         decoded_extractor->Extract(absl::MakeConstSpan(
-            &decoded.at(frame * num_samples_per_hop),
-            num_samples_per_hop));
+            &decoded.at(frame * num_samples_per_hop), num_samples_per_hop));
     ASSERT_TRUE(decoded_features_or.has_value());
     EXPECT_THAT(decoded_features_or,
                 testing::Optional(testing::SizeIs(kNumFeatures)));

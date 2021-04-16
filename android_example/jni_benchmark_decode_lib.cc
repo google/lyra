@@ -22,10 +22,9 @@
 #include "encoder_main_lib.h"
 #include "lyra_config.h"
 
-extern "C" JNIEXPORT jshortArray
-JNICALL
+extern "C" JNIEXPORT jshortArray JNICALL
 Java_com_example_android_lyra_MainActivity_encodeAndDecodeSamples(
-    JNIEnv *env, jobject this_obj, jshortArray samples, jint sample_length,
+    JNIEnv* env, jobject this_obj, jshortArray samples, jint sample_length,
     jstring model_base_path) {
   std::vector<int16_t> samples_vector(sample_length);
   std::vector<uint8_t> features;
@@ -34,17 +33,15 @@ Java_com_example_android_lyra_MainActivity_encodeAndDecodeSamples(
   env->GetShortArrayRegion(samples, jsize{0}, sample_length,
                            &samples_vector[0]);
 
-  const char *cpp_model_base_path = env->GetStringUTFChars(model_base_path, 0);
+  const char* cpp_model_base_path = env->GetStringUTFChars(model_base_path, 0);
   std::unique_ptr<chromemedia::codec::LyraDecoder> decoder =
-      chromemedia::codec::LyraDecoder::Create(16000,
-                                              chromemedia::codec::kNumChannels,
-                                              chromemedia::codec::kBitrate,
-                                              cpp_model_base_path);
+      chromemedia::codec::LyraDecoder::Create(
+          16000, chromemedia::codec::kNumChannels, chromemedia::codec::kBitrate,
+          cpp_model_base_path);
 
-  if (chromemedia::codec::EncodeWav(samples_vector,
-                                    chromemedia::codec::kNumChannels,
-                                    16000, false, false, cpp_model_base_path,
-                                    &features) &&
+  if (chromemedia::codec::EncodeWav(
+          samples_vector, chromemedia::codec::kNumChannels, 16000, false, false,
+          cpp_model_base_path, &features) &&
       chromemedia::codec::DecodeFeatures(features, 0.0, 1.0, decoder.get(),
                                          &decoded_audio)) {
     java_decoded_audio = env->NewShortArray(decoded_audio.size());
@@ -57,12 +54,11 @@ Java_com_example_android_lyra_MainActivity_encodeAndDecodeSamples(
   return java_decoded_audio;
 }
 
-extern "C" JNIEXPORT int
-JNICALL
+extern "C" JNIEXPORT int JNICALL
 Java_com_example_android_lyra_MainActivity_benchmarkDecode(
-        JNIEnv *env, jobject this_obj, jint num_cond_vectors,
-        jstring model_base_path) {
-  const char *cpp_model_base_path = env->GetStringUTFChars(model_base_path, 0);
+    JNIEnv* env, jobject this_obj, jint num_cond_vectors,
+    jstring model_base_path) {
+  const char* cpp_model_base_path = env->GetStringUTFChars(model_base_path, 0);
   int ret = chromemedia::codec::benchmark_decode(num_cond_vectors,
                                                  cpp_model_base_path);
   env->ReleaseStringUTFChars(model_base_path, cpp_model_base_path);

@@ -45,9 +45,7 @@ constexpr int kNumHeaderBits = 0;
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
     int num_output_features, int num_bits,
     const ghc::filesystem::path& model_path) {
-  return VectorQuantizerImpl::Create(num_output_features,
-                                     num_bits,
-                                     model_path);
+  return VectorQuantizerImpl::Create(num_output_features, num_bits, model_path);
 }
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
@@ -55,9 +53,9 @@ std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
     const Eigen::MatrixXf& transformation_matrix,
     const std::vector<float>& code_vectors,
     const std::vector<int16_t>& codebook_dimensions) {
-  return VectorQuantizerImpl::Create(
-      num_features, num_bits, mean_vector, transformation_matrix, code_vectors,
-      codebook_dimensions);
+  return VectorQuantizerImpl::Create(num_features, num_bits, mean_vector,
+                                     transformation_matrix, code_vectors,
+                                     codebook_dimensions);
 }
 
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(

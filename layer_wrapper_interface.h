@@ -29,7 +29,7 @@ enum class LayerType { kConv1D, kDilated, kTranspose };
 
 // Parameters to construct a LayerWrapper object.
 struct LayerParams {
-// Parameters of the convolution operation.
+  // Parameters of the convolution operation.
   // Some examples of how to set the parameters for transpose and dilated
   // convolutional layers are in the test.
 

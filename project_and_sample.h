@@ -241,7 +241,7 @@ class ProjectAndSample {
       scale = logf(expf(scale) + 1.0f);
       std::uniform_real_distribution<float> dist;
 
-  // Truncated logistic distribution.
+      // Truncated logistic distribution.
       const float kProbabilityScale = 1.0f - 2.0f * probability_offset_;
       float prob =
           dist(*thread_local_gen) * kProbabilityScale + probability_offset_;

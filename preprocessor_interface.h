@@ -30,7 +30,7 @@ class PreprocessorInterface {
  public:
   // Pre-process the input audio stream.
   virtual std::vector<int16_t> Process(absl::Span<const int16_t> input,
-                               int sample_rate_hz) = 0;
+                                       int sample_rate_hz) = 0;
 
   virtual ~PreprocessorInterface() = default;
 };

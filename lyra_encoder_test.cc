@@ -88,7 +88,6 @@ class LyraEncoderPeer {
   LyraEncoder encoder_;
 };
 
-
 namespace {
 
 using testing::_;

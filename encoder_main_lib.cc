@@ -42,8 +42,8 @@ namespace codec {
 // Packets are appended to encoded_features. The oldest packet is encoded
 // starting at index 0.
 bool EncodeWav(const std::vector<int16_t>& wav_data, int num_channels,
-               int sample_rate_hz, bool enable_preprocessing,
-               bool enable_dtx, const ghc::filesystem::path& model_path,
+               int sample_rate_hz, bool enable_preprocessing, bool enable_dtx,
+               const ghc::filesystem::path& model_path,
                std::vector<uint8_t>* encoded_features) {
   auto encoder = LyraEncoder::Create(/*sample_rate_hz=*/sample_rate_hz,
                                      /*num_channels=*/num_channels,
@@ -92,8 +92,8 @@ bool EncodeWav(const std::vector<int16_t>& wav_data, int num_channels,
   }
   const auto elapsed = absl::Now() - benchmark_start;
   LOG(INFO) << "Elapsed seconds : " << absl::ToInt64Seconds(elapsed);
-  LOG(INFO) << "Samples per second : " <<
-      wav_data.size() / absl::ToDoubleSeconds(elapsed);
+  LOG(INFO) << "Samples per second : "
+            << wav_data.size() / absl::ToDoubleSeconds(elapsed);
 
   return true;
 }

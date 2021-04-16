@@ -14,10 +14,10 @@
 
 #include <string>
 
-#include "benchmark_decode_lib.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/flags/flag.h"
+#include "benchmark_decode_lib.h"
 
 ABSL_FLAG(int, num_cond_vectors, 2000,
           "The number of conditioning vectors to feed to the conditioning "
@@ -35,6 +35,5 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
   return chromemedia::codec::benchmark_decode(
-      absl::GetFlag(FLAGS_num_cond_vectors),
-      absl::GetFlag(FLAGS_model_path));
+      absl::GetFlag(FLAGS_num_cond_vectors), absl::GetFlag(FLAGS_model_path));
 }

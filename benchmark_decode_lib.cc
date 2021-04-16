@@ -29,11 +29,11 @@
 
 #include "audio/dsp/signal_vector_util.h"
 #include "glog/logging.h"
-#include "absl/types/optional.h"
-#include "absl/types/span.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "include/ghc/filesystem.hpp"
 #include "architecture_utils.h"
 #include "generative_model_interface.h"
@@ -100,11 +100,9 @@ void PrintStatsAndWriteCSV(const std::vector<int64_t>& timings,
 }
 
 int benchmark_decode(const int num_cond_vectors,
-                     const std::string &model_base_path)
-{
+                     const std::string& model_base_path) {
   const std::string model_path =
-      chromemedia::codec::GetCompleteArchitecturePath(
-          model_base_path);
+      chromemedia::codec::GetCompleteArchitecturePath(model_base_path);
   if (num_cond_vectors <= 0) {
     LOG(ERROR) << "The number of conditioning vectors has to be positive.";
     return -1;

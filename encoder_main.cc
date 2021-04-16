@@ -52,8 +52,7 @@ int main(int argc, char** argv) {
   const ghc::filesystem::path model_path =
       chromemedia::codec::GetCompleteArchitecturePath(
           absl::GetFlag(FLAGS_model_path));
-  const bool enable_preprocessing =
-      absl::GetFlag(FLAGS_enable_preprocessing);
+  const bool enable_preprocessing = absl::GetFlag(FLAGS_enable_preprocessing);
   const bool enable_dtx = absl::GetFlag(FLAGS_enable_dtx);
 
   if (input_path.empty()) {

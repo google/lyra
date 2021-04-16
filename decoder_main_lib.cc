@@ -49,7 +49,6 @@ int PacketSize(LyraDecoder* decoder) {
 
 }  // namespace
 
-
 bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
                     float packet_loss_rate, float average_burst_length,
                     LyraDecoder* decoder, std::vector<int16_t>* decoded_audio) {
@@ -95,8 +94,8 @@ bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
 
   const auto elapsed = absl::Now() - benchmark_start;
   LOG(INFO) << "Elapsed seconds : " << absl::ToInt64Seconds(elapsed);
-  LOG(INFO) << "Samples per second : " <<
-      decoded_audio->size() / absl::ToDoubleSeconds(elapsed);
+  LOG(INFO) << "Samples per second : "
+            << decoded_audio->size() / absl::ToDoubleSeconds(elapsed);
   return true;
 }
 

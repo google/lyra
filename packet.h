@@ -108,7 +108,7 @@ class Packet : public PacketInterface {
       const absl::Span<const uint8_t> encoded) {
     std::bitset<NumQuantizedBits> quantized_features(0);
     int left_shift_amount = static_cast<int>(NumQuantizedBits) +
-        static_cast<int>(NumHeaderBits) - CHAR_BIT;
+                            static_cast<int>(NumHeaderBits) - CHAR_BIT;
     // Shift each byte from packet into its proper place in quantized_features
     // where the first bit of quantized data occurs after the header bits.
     for (uint8_t packet_byte : encoded) {

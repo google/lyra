@@ -44,7 +44,7 @@ ABSL_ATTRIBUTE_UNUSED void PrintStatsAndWriteCSV(
     const std::vector<int64_t>& timings, const absl::string_view title);
 
 int benchmark_decode(const int num_cond_vectors,
-                     const std::string &model_base_path);
+                     const std::string& model_base_path);
 
 }  // namespace codec
 }  // namespace chromemedia
