@@ -118,13 +118,13 @@ bazel_skylib_workspace()
 
 android_sdk_repository(
     name = "androidsdk",
-    api_level = 29,
-    build_tools_version = "29.0.3"
+    api_level = 30,
+    build_tools_version = "30.0.3"
 )
 
 android_ndk_repository(
     name = "androidndk",
-    api_level = 29
+    api_level = 30
 )
 
 http_archive(
