@@ -1,5 +1,7 @@
-# A clang/libc++ toolchain used when `--config=clang_config` is set.
-# See the top-level README.md to set up clang/libc++.
+"""A clang-based c++ toolchain for linux builds.
+
+ See the top-level README.md to set up clang/libc++.
+"""
 
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
