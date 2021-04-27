@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "gtest/gtest.h"
 
 namespace chromemedia {
 namespace codec {

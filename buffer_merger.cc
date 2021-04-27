@@ -23,10 +23,10 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "filter_banks.h"
 #include "filter_banks_interface.h"
+#include "glog/logging.h"
 
 namespace chromemedia {
 namespace codec {

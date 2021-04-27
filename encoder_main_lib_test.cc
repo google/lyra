@@ -20,11 +20,11 @@
 // placeholder for get runfiles header.
 #include "gmock/gmock.h"
 // placeholder for testing header.
-#include "gtest/gtest.h"
 #include "absl/flags/flag.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 
 namespace chromemedia {
@@ -35,18 +35,14 @@ static constexpr absl::string_view kWavFiles[] = {
     "48khz_sample_000003", "32khz_sample_000002", "16khz_sample_000001",
     "8khz_sample_000000"};
 
-static constexpr absl::string_view kTestdataDir =
-    "testdata";
+static constexpr absl::string_view kTestdataDir = "testdata";
 
 class EncoderMainLibTest : public testing::Test {
  protected:
   EncoderMainLibTest()
-      : output_dir_(ghc::filesystem::path(testing::TempDir()) /
-                    "output"),
-        testdata_dir_(ghc::filesystem::current_path() /
-                      kTestdataDir),
-        model_path_(ghc::filesystem::current_path() /
-                    "wavegru") {}
+      : output_dir_(ghc::filesystem::path(testing::TempDir()) / "output"),
+        testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
+        model_path_(ghc::filesystem::current_path() / "wavegru") {}
 
   void SetUp() override {
     std::error_code error_code;

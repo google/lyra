@@ -21,8 +21,8 @@
 #include <optional>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "generative_model_interface.h"
+#include "gmock/gmock.h"
 
 namespace chromemedia {
 namespace codec {

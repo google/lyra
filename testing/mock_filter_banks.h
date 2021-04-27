@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "filter_banks_interface.h"
+#include "gmock/gmock.h"
 
 namespace chromemedia {
 namespace codec {

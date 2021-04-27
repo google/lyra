@@ -23,11 +23,11 @@
 // placeholder for get runfiles header.
 #include "gmock/gmock.h"
 // placeholder for testing header.
-#include "gtest/gtest.h"
 #include "absl/flags/flag.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "wav_util.h"
@@ -36,20 +36,15 @@ namespace chromemedia {
 namespace codec {
 namespace {
 
-static constexpr absl::string_view kTestdataDir =
-    "testdata";
-static constexpr absl::string_view kExportedModelPath =
-    "wavegru";
+static constexpr absl::string_view kTestdataDir = "testdata";
+static constexpr absl::string_view kExportedModelPath = "wavegru";
 
 class DecoderMainLibTest : public testing::TestWithParam<int> {
  protected:
   DecoderMainLibTest()
-      : output_dir_(ghc::filesystem::path(testing::TempDir()) /
-                    "output/"),
-        testdata_dir_(ghc::filesystem::current_path() /
-                      kTestdataDir),
-        model_path_(ghc::filesystem::current_path() /
-                    kExportedModelPath),
+      : output_dir_(ghc::filesystem::path(testing::TempDir()) / "output/"),
+        testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
+        model_path_(ghc::filesystem::current_path() / kExportedModelPath),
         sample_rate_hz_(GetParam()),
         num_samples_in_packet_(kNumFramesPerPacket *
                                GetNumSamplesPerHop(sample_rate_hz_)) {}

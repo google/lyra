@@ -23,14 +23,14 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "comfort_noise_generator.h"
 #include "generative_model_interface.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_components.h"
 #include "lyra_config.h"
 #include "packet_interface.h"

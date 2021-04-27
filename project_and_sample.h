@@ -26,11 +26,11 @@
 #include <string>
 #include <utility>
 
-#include "glog/logging.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "glog/logging.h"
 #include "lyra_types.h"
 #include "sparse_inference_matrixvector.h"
 

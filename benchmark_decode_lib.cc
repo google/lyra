@@ -27,16 +27,16 @@
 #include <type_traits>
 #include <vector>
 
-#include "audio/dsp/signal_vector_util.h"
-#include "glog/logging.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "architecture_utils.h"
+#include "audio/dsp/signal_vector_util.h"
 #include "generative_model_interface.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "log_mel_spectrogram_extractor_impl.h"
 #include "lyra_config.h"
 #include "wavegru_model_impl.h"

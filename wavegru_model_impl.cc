@@ -22,10 +22,10 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
-#include "include/ghc/filesystem.hpp"
 #include "buffer_merger.h"
 #include "causal_convolutional_conditioning.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_wavegru.h"
 #include "sparse_inference_matrixvector.h"
 // IWYU pragma: no_include "speech/greco3/core/thread.h"

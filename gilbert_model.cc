@@ -17,8 +17,8 @@
 #include <memory>
 #include <random>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
+#include "glog/logging.h"
 
 namespace chromemedia {
 namespace codec {

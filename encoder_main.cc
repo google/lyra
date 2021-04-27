@@ -15,14 +15,14 @@
 #include <string>
 #include <system_error>  // NOLINT(build/c++11)
 
+#include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
-#include "glog/logging.h"
-#include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
-#include "include/ghc/filesystem.hpp"
 #include "architecture_utils.h"
 #include "encoder_main_lib.h"
+#include "glog/logging.h"
+#include "include/ghc/filesystem.hpp"
 
 ABSL_FLAG(std::string, input_path, "",
           "Complete path to the WAV file to be encoded.");

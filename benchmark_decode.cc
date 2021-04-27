@@ -14,9 +14,9 @@
 
 #include <string>
 
+#include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
-#include "absl/flags/flag.h"
 #include "benchmark_decode_lib.h"
 
 ABSL_FLAG(int, num_cond_vectors, 2000,

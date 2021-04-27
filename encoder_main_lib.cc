@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
@@ -30,11 +29,12 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "glog/logging.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "lyra_encoder.h"
-#include "wav_util.h"
 #include "no_op_preprocessor.h"
+#include "wav_util.h"
 
 namespace chromemedia {
 namespace codec {

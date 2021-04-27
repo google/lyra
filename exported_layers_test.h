@@ -22,9 +22,9 @@
 #include <vector>
 
 // placeholder for get runfiles header.
+#include "absl/random/random.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/random/random.h"
 #include "include/ghc/filesystem.hpp"
 #include "layer_wrappers_lib.h"
 #include "lyra_types.h"
@@ -37,8 +37,7 @@ template <typename LayerTypes>
 class ExportedLayersTest : public testing::Test {
  protected:
   ExportedLayersTest()
-      : model_path_(ghc::filesystem::current_path() /
-                    "wavegru"),
+      : model_path_(ghc::filesystem::current_path() / "wavegru"),
         params_(LayerTypes::Params(model_path_.string())),
         spin_barrier_(1) {}
 

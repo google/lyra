@@ -21,10 +21,10 @@
 #include <memory>
 #include <vector>
 
-#include "audio/dsp/mfcc/mel_filterbank.h"
-#include "audio/dsp/spectrogram/spectrogram.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "audio/dsp/mfcc/mel_filterbank.h"
+#include "audio/dsp/spectrogram/spectrogram.h"
 #include "feature_extractor_interface.h"
 
 namespace chromemedia {

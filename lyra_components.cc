@@ -18,8 +18,8 @@
 #include <memory>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "Eigen/Core"
+#include "absl/memory/memory.h"
 #include "feature_extractor_interface.h"
 #include "generative_model_interface.h"
 #include "log_mel_spectrogram_extractor_impl.h"

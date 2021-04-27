@@ -20,9 +20,9 @@
 #include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "audio/dsp/signal_vector_util.h"
 #include "gtest/gtest.h"
-#include "absl/types/span.h"
 #include "lyra_config.h"
 
 namespace chromemedia {

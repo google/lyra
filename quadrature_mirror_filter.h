@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "audio/linear_filters/biquad_filter.h"
 #include "absl/types/span.h"
+#include "audio/linear_filters/biquad_filter.h"
 
 namespace chromemedia {
 namespace codec {

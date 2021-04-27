@@ -36,8 +36,7 @@ template <typename ComputeType>
 class TransposeConvolutionalLayerWrapperTest : public ::testing::Test {
  public:
   TransposeConvolutionalLayerWrapperTest()
-      : testdata_dir_(ghc::filesystem::current_path() /
-                      "testdata"),
+      : testdata_dir_(ghc::filesystem::current_path() / "testdata"),
         transpose_params_{.num_input_channels = kNumCondHidden,
                           .num_filters = kNumCondHidden,
                           .length = kTransposeLength,

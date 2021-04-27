@@ -21,9 +21,9 @@
 #include <optional>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "absl/types/span.h"
 #include "feature_extractor_interface.h"
+#include "gmock/gmock.h"
 
 namespace chromemedia {
 namespace codec {

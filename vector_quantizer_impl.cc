@@ -22,12 +22,12 @@
 #include <string>
 #include <vector>
 
-#include "audio/dsp/signal_vector_util.h"
-#include "glog/logging.h"
+#include "Eigen/LU"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/types/optional.h"
-#include "Eigen/LU"
+#include "audio/dsp/signal_vector_util.h"
+#include "glog/logging.h"
 #include "include/ghc/filesystem.hpp"
 #include "sparse_inference_matrixvector.h"
 

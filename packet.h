@@ -24,9 +24,9 @@
 #include <string>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "glog/logging.h"
 #include "packet_interface.h"
 
 namespace chromemedia {

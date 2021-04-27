@@ -19,8 +19,8 @@
 
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "absl/types/optional.h"
+#include "gmock/gmock.h"
 #include "packet_loss_handler_interface.h"
 
 namespace chromemedia {

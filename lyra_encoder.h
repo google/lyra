@@ -21,12 +21,12 @@
 #include <memory>
 #include <vector>
 
-#include "audio/linear_filters/biquad_filter.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
+#include "audio/linear_filters/biquad_filter.h"
 #include "denoiser_interface.h"
 #include "feature_extractor_interface.h"
+#include "include/ghc/filesystem.hpp"
 #include "lyra_encoder_interface.h"
 #include "noise_estimator_interface.h"
 #include "packet_interface.h"

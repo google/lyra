@@ -27,15 +27,15 @@
 #include <vector>
 
 // placeholder for get runfiles header.
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/memory/memory.h"
 #include "absl/random/random.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"
-#include "include/ghc/filesystem.hpp"
 #include "generative_model_interface.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "include/ghc/filesystem.hpp"
 #include "log_mel_spectrogram_extractor_impl.h"
 #include "lyra_config.h"
 #include "packet.h"
@@ -103,8 +103,7 @@ namespace {
 
 using testing::Return;
 
-static constexpr absl::string_view kExportedModelPath =
-    "wavegru";
+static constexpr absl::string_view kExportedModelPath = "wavegru";
 
 class LyraDecoderTest
     : public testing::TestWithParam<testing::tuple<int, int>> {
@@ -114,8 +113,7 @@ class LyraDecoderTest
   LyraDecoderTest()
       : sample_rate_hz_(std::get<0>(GetParam())),
         num_frames_per_packet_(std::get<1>(GetParam())),
-        model_path_(ghc::filesystem::current_path() /
-                    kExportedModelPath),
+        model_path_(ghc::filesystem::current_path() / kExportedModelPath),
         mock_concatenated_features_(num_frames_per_packet_ * kNumFeatures),
         mock_feature_frames_(num_frames_per_packet_),
         mock_samples_(

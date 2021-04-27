@@ -18,8 +18,8 @@
 #include <utility>
 #include <vector>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
+#include "glog/logging.h"
 #include "naive_spectrogram_predictor.h"
 #include "noise_estimator.h"
 #include "noise_estimator_interface.h"

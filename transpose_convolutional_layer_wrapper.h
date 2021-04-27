@@ -21,8 +21,8 @@
 #include <string>
 #include <utility>
 
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
+#include "glog/logging.h"
 #include "layer_wrapper.h"
 #include "sparse_inference_matrixvector.h"
 

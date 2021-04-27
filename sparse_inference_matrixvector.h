@@ -17,8 +17,8 @@
 #ifndef LYRA_CODEC_SPARSE_INFERENCE_MATRIXVECTOR_H_
 #define LYRA_CODEC_SPARSE_INFERENCE_MATRIXVECTOR_H_
 
-#include "glog/logging.h"
 #include "absl/status/status.h"
+#include "glog/logging.h"
 
 // [internal] Start of sparse_inference_matrixvector declarations.
 

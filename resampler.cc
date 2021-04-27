@@ -19,11 +19,11 @@
 #include <memory>
 #include <vector>
 
-#include "audio/dsp/resampler_q.h"
-#include "glog/logging.h"
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
+#include "audio/dsp/resampler_q.h"
 #include "dsp_util.h"
+#include "glog/logging.h"
 
 namespace chromemedia {
 namespace codec {
