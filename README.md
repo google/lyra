@@ -43,7 +43,7 @@ There are a few things you'll need to do to set up your computer to build Lyra.
 Lyra is built using Google's build system, Bazel. Install it following these
 [instructions](https://docs.bazel.build/versions/master/install.html).
 Bazel verson 4.0.0 is required, and some Linux distributions may make an older
-version available in their application repositories, so make sure you are 
+version available in their application repositories, so make sure you are
 using the required version or newer. The latest version can be downloaded via
 [Github](https://github.com/bazelbuild/bazel/releases).
 
