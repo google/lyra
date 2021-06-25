@@ -27,7 +27,7 @@
 #include "glog/logging.h"
 #include "layer_wrappers_lib.h"
 #include "lyra_types.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -96,7 +96,7 @@ class CausalConvolutionalConditioning {
   CausalConvolutionalConditioning(int feature_depth, int num_cond_hiddens,
                                   int num_hiddens, int num_samples_per_hop,
                                   int num_frames_per_packet, int num_threads,
-                                  const std::string& path,
+                                  float silence_value, const std::string& path,
                                   const std::string& prefix)
       : feature_depth_(feature_depth),
         num_hiddens_(num_hiddens),
@@ -106,8 +106,7 @@ class CausalConvolutionalConditioning {
         num_threads_(num_threads),
         path_(path),
         prefix_(prefix),
-        num_precomputed_frames_(0),
-        spin_barrier_(num_threads_) {
+        num_precomputed_frames_(0) {
     // Crash ok.
     CHECK_LE(num_threads_, num_cond_hiddens)
         << "Number of threads must be <= the number of hidden layers "
@@ -121,6 +120,7 @@ class CausalConvolutionalConditioning {
 
     CreateLayers();
     PrepareOutput();
+    WarmUp(silence_value);
   }
 
   ~CausalConvolutionalConditioning() {}
@@ -147,7 +147,7 @@ class CausalConvolutionalConditioning {
     auto f = [this](csrblocksparse::SpinBarrier* barrier, int tid) {
       ComputeFunction(barrier, tid);
     };
-    LaunchOnThreadsWithBarrier(num_threads_, f);
+    csrblocksparse::LaunchOnThreadsWithBarrier(num_threads_, f);
   }
 
   int num_samples() const {
@@ -349,6 +349,21 @@ class CausalConvolutionalConditioning {
     conditioning_.FillZero();
   }
 
+  void WarmUp(float silence_value) {
+    csrblocksparse::CacheAlignedVector<float> silence_vector(
+        feature_depth_ * kCondInputNumTimesteps);
+    silence_vector.FillWith(silence_value);
+    const csrblocksparse::FatCacheAlignedVector<float> silence_input(
+        silence_vector, feature_depth_);
+    const int kNumPaddingFrames = (kConv1DKernel - 1) / 2;
+    csrblocksparse::SpinBarrier spin_barrier(0);
+    for (int i = 0; i < kNumPaddingFrames; ++i) {
+      InsertNewInput(silence_input);
+      conv1d_layer_->Run(0, &spin_barrier,
+                         dilated_conv_layer_0_->InputViewToUpdate());
+    }
+  }
+
   void InsertNewInput(
       const csrblocksparse::FatCacheAlignedVector<float>& input) {
     // This conversion might not always be necessary, will
@@ -435,7 +450,6 @@ class CausalConvolutionalConditioning {
   const std::string prefix_;
 
   int num_precomputed_frames_;
-  csrblocksparse::SpinBarrier spin_barrier_;
 
   std::unique_ptr<Conv1DLayerType> conv1d_layer_;
   std::unique_ptr<CondStack0LayerType> dilated_conv_layer_0_;

@@ -17,9 +17,9 @@
 #include <string>
 #include <system_error>  // NOLINT(build/c++11)
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "gmock/gmock.h"
-// placeholder for testing header.
+// Placeholder for testing header.
 #include "absl/flags/flag.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"

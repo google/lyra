@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
@@ -33,7 +33,7 @@ class WavegruModelImplTest : public testing::Test {
   WavegruModelImplTest()
       : num_samples_per_hop_(GetNumSamplesPerHop(kInternalSampleRateHz)),
         model_(WavegruModelImpl::Create(
-            num_samples_per_hop_, kNumFeatures, kNumFramesPerPacket,
+            num_samples_per_hop_, kNumFeatures, kNumFramesPerPacket, 0.0f,
             ghc::filesystem::current_path() / "wavegru")) {}
   const int num_samples_per_hop_;
   std::unique_ptr<WavegruModelImpl> model_;

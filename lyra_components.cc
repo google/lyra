@@ -61,8 +61,9 @@ std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
     int num_samples_per_hop, int num_output_features, int num_frames_per_packet,
     const ghc::filesystem::path& model_path) {
-  return WavegruModelImpl::Create(num_samples_per_hop, num_output_features,
-                                  num_frames_per_packet, model_path);
+  return WavegruModelImpl::Create(
+      num_samples_per_hop, num_output_features, num_frames_per_packet,
+      LogMelSpectrogramExtractorImpl::GetSilenceValue(), model_path);
 }
 
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(

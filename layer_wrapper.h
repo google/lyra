@@ -18,6 +18,7 @@
 #define LYRA_CODEC_LAYER_WRAPPER_H_
 
 #include <memory>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <variant>
@@ -26,7 +27,7 @@
 #include "dsp_util.h"
 #include "glog/logging.h"
 #include "layer_wrapper_interface.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -203,6 +204,21 @@ class LayerWrapper : public LayerWrapperInterface<WeightType, RhsType,
             class LayerWrapperTypeTemplate>
   friend class LayerWrapperPeer;
 };
+
+// Provide operator<< for unique_ptr to allow using this with CHECK()
+// macros.  This is required in gcc/libstdc++ at -std=gnu++17, but
+// clang/libstdc++ at the same -std=gnu++17 provides this operator.
+// Note that this will not be necessary in c++20, where the operator
+// is defined for unique_ptr in the standard:
+// https://en.cppreference.com/w/cpp/memory/unique_ptr/operator_ltlt
+template <typename WeightType, typename RhsType, typename OutputType,
+          typename DiskWeightType>
+std::ostream& operator<<(
+    std::ostream& out_stream,
+    const std::unique_ptr<LayerWrapper<WeightType, RhsType, OutputType,
+                                       DiskWeightType>>& layer_ptr) {
+  return out_stream << layer_ptr.get();
+}
 
 }  // namespace codec
 }  // namespace chromemedia

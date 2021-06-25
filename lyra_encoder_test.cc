@@ -26,7 +26,7 @@
 #include <utility>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/memory/memory.h"   // IWYU pragma: keep
 #include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"

@@ -12,14 +12,6 @@ filegroup(
     output_licenses = ["unencumbered"],
 )
 
-filegroup(
-    name = "compiler_files",
-    srcs = [
-        ":includes",
-    ],
-    output_licenses = ["unencumbered"],
-)
-
 cc_toolchain(
     name = "k8_toolchain",
     all_files = ":empty",

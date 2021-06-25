@@ -21,7 +21,7 @@
 #include <vector>
 
 #include "glog/logging.h"
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"

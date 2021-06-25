@@ -30,7 +30,7 @@ parallel multiple signals in different frequency ranges that it later combines
 into a single output signal at the desired sample rate. This trick, plus 64-bit
 ARM optimizations, enables Lyra to not only run on cloud servers, but also
 on-device on mid-range phones, such as Pixel phones, in real time (with a
-processing latency of 90ms). This generative model is then trained on thousands
+processing latency of 100ms). This generative model is then trained on thousands
 of hours of speech data with speakers in over 70 languages and optimized to
 accurately recreate the input audio.
 
@@ -50,44 +50,6 @@ using the required version or newer. The latest version can be downloaded via
 Lyra can be built from linux using bazel for an arm android target, or a linux
 target.  The android target is optimized for realtime performance.  The linux
 target is typically used for development and debugging.
-
-You will also need to install some tools (which may already be on your system).
-You can install them with:
-
-```shell
-sudo apt update
-sudo apt install ninja-build git cmake clang python
-```
-
-### Linux requirements
-
-The instructions below are for Ubuntu and have been verified on 20.04.
-
-You will need to install a certain version of clang to ensure ABI compatibility.
-
-```shell
-git clone https://github.com/llvm/llvm-project.git
-cd llvm-project
-git checkout 96ef4f307df2
-
-mkdir build_clang
-cd build_clang
-cmake -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=release ../llvm
-ninja
-sudo $(which ninja) install
-
-cd ..
-mkdir build_libcxx
-cd build_libcxx
-cmake -G Ninja -DCMAKE_C_COMPILER=/usr/local/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++ -DLLVM_ENABLE_PROJECTS="libcxx;libcxxabi" -DCMAKE_BUILD_TYPE=release ../llvm
-ninja
-sudo $(which ninja) install
-
-sudo ldconfig
-```
-
-Note: the above will install a particular version of libc++ to /usr/local/lib,
-and clang to /usr/local/bin, which the toolchain depends on.
 
 ### Android requirements
 
@@ -158,6 +120,11 @@ bazel build -c opt :decoder_main
 bazel-bin/decoder_main  --model_path=wavegru --output_dir=$HOME/temp/ --encoded_path=$HOME/temp/16khz_sample_000001.lyra
 ```
 
+Note: the default Bazel toolchain is automatically configured and likely uses
+gcc/libstdc++ on Linux.  This should be satisfactory for most users, but will
+differ from the NDK toolchain, which uses clang/libc++.  To use a custom clang
+toolchain on Linux, see toolchain/README.md and .bazelrc.
+
 ### Building for Android
 
 #### Android App
@@ -184,8 +151,8 @@ Press "Record from microphone", say a few words (be sure to have your microphone
 near your mouth), and then press "Encode and decode to speaker". You should hear
 your voice being played back after being coded with Lyra.
 
-If you press 'Benchmark', you should you should see something like the following
-in logcat on a Pixel 4 when running the benchmark:
+If you press 'Benchmark', you should see something like the following in logcat
+on a Pixel 4 when running the benchmark:
 
 ```shell
 I  Starting benchmarkDecode()
@@ -209,7 +176,8 @@ with `--copt=-DUSE_FIXED16`, although there may be some loss of quality.
 
 To build your own android app, you can either use the cc_library target outputs
 to create a .so that you can use in your own build system. Or you can use it
-with an [`android_binary`](https://docs.bazel.build/versions/master/be/android.html)
+with an
+[`android_binary`](https://docs.bazel.build/versions/master/be/android.html)
 rule within bazel to create an .apk file as in this example.
 
 There is a tutorial on building for android with Bazel in the
@@ -232,13 +200,11 @@ This builds an executable binary that can be run on android 64-bit arm devices
 a binary through the shell.
 
 ```shell
-# Push the binary and the data it needs, including the model, .wav, and .so files:
+# Push the binary and the data it needs, including the model and .wav files:
 adb push bazel-bin/encoder_main /data/local/tmp/
 adb push bazel-bin/decoder_main /data/local/tmp/
 adb push wavegru/ /data/local/tmp/
 adb push testdata/ /data/local/tmp/
-adb shell mkdir -p /data/local/tmp/_U_S_S_Csparse_Uinference_Umatrixvector___Ulib_Sandroid_Uarm64
-adb push bazel-bin/_solib_arm64-v8a/_U_S_S_Csparse_Uinference_Umatrixvector___Ulib_Sandroid_Uarm64/libsparse_inference.so /data/local/tmp/_U_S_S_Csparse_Uinference_Umatrixvector___Ulib_Sandroid_Uarm64
 
 adb shell
 cd /data/local/tmp
@@ -325,10 +291,10 @@ class LyraDecoder : public LyraDecoderInterface {
 
 Once again, the static `Create` method instantiates a `LyraDecoder` with the
 desired sample rate in Hertz, number of channels and bitrate, as long as those
-parameters are supported. Else it returns a `nullptr`. These parameters don't need
-to be the same as the ones in `LyraEncoder`. And once again, the `Create` method
-also needs to know where the model weights are stored. It also checks that these
-weights exist and are compatible with the current Lyra version.
+parameters are supported. Else it returns a `nullptr`. These parameters don't
+need to be the same as the ones in `LyraEncoder`. And once again, the `Create`
+method also needs to know where the model weights are stored. It also checks
+that these weights exist and are compatible with the current Lyra version.
 
 Given a `LyraDecoder`, any packet can be decoded by first feeding it into
 `SetEncodedPacket`, which returns true if the provided span of bytes is a valid
@@ -350,18 +316,23 @@ The rest of the `LyraDecoder` methods are just getters for the different
 predetermined parameters.
 
 For an example on how to use `LyraEncoder` and `LyraDecoder` to encode and
-decode a stream of audio, please refer to the [integration
-test](lyra_integration_test.cc).
+decode a stream of audio, please refer to the
+[integration test](lyra_integration_test.cc).
+
+## Sparse Matrix Multiplication Library
+Lyra uses a library in the `sparse_matmul` directory that enables fast execution
+of sparse Matrix-Vector multiplication ops on mobile and desktop CPU platforms
+(ARM and AVX2) to allow for real-time operation on phones.  This library was
+created by DeepMind for their implementation of WaveRNN with sparsity [[4]](#4),
+which gave a huge improvement in complexity over WaveNet.
+
+A generic kernel is also provided, which enables debugging on non-optimized
+platforms.  Contributions for other platforms are welcome.
 
 ## License
 
 Use of this source code is governed by a Apache v2.0 license that can be found
 in the LICENSE file.
-
-Please note that there is a closed-source kernel used for math operations that
-is linked via a shared object called libsparse_inference.so. We provide the
-libsparse_inference.so library to be linked, but are unable to provide source
-for it. This is the reason that a specific toolchain/compiler is required.
 
 ## Papers
 
@@ -376,3 +347,7 @@ for it. This is the reason that a specific toolchain/compiler is required.
    & Yeh, H. (2021). [Generative Speech Coding with Predictive Variance
    Regularization](https://arxiv.org/pdf/2102.09660). arXiv preprint
    arXiv:2102.09660.
+<a id="4">4.</a> Kalchbrenner, N., Elsen, E., Simonyan, K., Noury, S.,
+   Casagrande, N., Lockhart, E., ... & Kavukcuoglu, K. (2018, July).
+   [Efficient neural audio synthesis](https://arxiv.org/abs/1802.08435).
+   In International Conference on Machine Learning (pp. 2410-2419). PMLR.

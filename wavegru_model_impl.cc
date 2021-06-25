@@ -27,7 +27,7 @@
 #include "glog/logging.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_wavegru.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 // IWYU pragma: no_include "speech/greco3/core/thread.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
@@ -42,7 +42,7 @@ namespace codec {
 
 std::unique_ptr<WavegruModelImpl> WavegruModelImpl::Create(
     int num_samples_per_hop, int num_features, int num_frames_per_packet,
-    const ghc::filesystem::path& model_path) {
+    float silence_value, const ghc::filesystem::path& model_path) {
   const int kNumThreads = 1;
   const int kNumCondHiddens = 512;
   const std::string kModelPrefix = "lyra_16khz";
@@ -63,13 +63,13 @@ std::unique_ptr<WavegruModelImpl> WavegruModelImpl::Create(
   return absl::WrapUnique(new WavegruModelImpl(
       std::string(model_path), kModelPrefix, kNumThreads, num_features,
       kNumCondHiddens, num_samples_per_hop, num_frames_per_packet,
-      std::move(wavegru), std::move(merge_filter)));
+      silence_value, std::move(wavegru), std::move(merge_filter)));
 }
 
 WavegruModelImpl::WavegruModelImpl(
     const std::string& model_path, const std::string& model_prefix,
     int num_threads, int num_features, int num_cond_hiddens,
-    int num_samples_per_hop, int num_frames_per_packet,
+    int num_samples_per_hop, int num_frames_per_packet, float silence_value,
     std::unique_ptr<LyraWavegru<ComputeType>> wavegru,
     std::unique_ptr<BufferMerger> buffer_merger)
     : num_threads_(num_threads),
@@ -90,7 +90,7 @@ WavegruModelImpl::WavegruModelImpl(
   conditioning_ = absl::make_unique<ConditioningType>(
       num_features, num_cond_hiddens, wavegru_->num_gru_hiddens(),
       num_samples_per_hop_, num_frames_per_packet,
-      /*num_threads=*/1, model_path, model_prefix);
+      /*num_threads=*/1, silence_value, model_path, model_prefix);
 }
 
 WavegruModelImpl::~WavegruModelImpl() {
@@ -130,8 +130,7 @@ absl::optional<std::vector<int16_t>> WavegruModelImpl::GenerateSamples(
         wavegru_->SampleThreaded(tid, conditioning_.get(),
                                  &model_split_samples_, 0);
       };
-      background_threads_.emplace_back(
-          absl::make_unique<csrblocksparse::Thread>(f));
+      background_threads_.emplace_back(absl::make_unique<std::thread>(f));
     }
   }
 

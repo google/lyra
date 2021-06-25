@@ -40,13 +40,60 @@ TEST(DspUtilTest, LogSpectralDistanceTest) {
   EXPECT_NEAR(log_spectral_distance_or.value(), 10.0f, 0.0001);
 }
 
-TEST(DspUtilTest, ClipTest) {
-  const float kMax = ClipToInt16(10000000);
-  EXPECT_EQ(kMax, std::numeric_limits<int16_t>::max());
-  const float kZero = ClipToInt16(0);
+TEST(ClipToInt16Test, ClipsExtremeValues) {
+  const int16_t kMaxExceeded = ClipToInt16(10000000);
+  EXPECT_EQ(kMaxExceeded, std::numeric_limits<int16_t>::max());
+  const int16_t kMinExceeded = ClipToInt16(-10000000);
+  EXPECT_EQ(kMinExceeded, std::numeric_limits<int16_t>::min());
+}
+
+TEST(ClipToInt16Test, TruncatesDecimal) {
+  const int16_t kJustAboveZero = ClipToInt16(.0001);
+  EXPECT_EQ(kJustAboveZero, 0);
+
+  const int16_t kJustBelowOne = ClipToInt16(.999);
+  EXPECT_EQ(kJustBelowOne, 0);
+
+  const int16_t kShouldTruncateNegativeDecimalToZero = ClipToInt16(-.0001);
+  EXPECT_EQ(kShouldTruncateNegativeDecimalToZero, 0);
+}
+
+TEST(ClipToInt16Test, BoundaryIdentity) {
+  const int16_t kZero = ClipToInt16(0);
   EXPECT_EQ(kZero, 0);
-  const float kMin = ClipToInt16(-10000000);
-  EXPECT_EQ(kMin, std::numeric_limits<int16_t>::min());
+
+  const int16_t kMaxBoundary = ClipToInt16(std::numeric_limits<int16_t>::max());
+  EXPECT_EQ(kMaxBoundary, std::numeric_limits<int16_t>::max());
+
+  const int16_t kMinBoundary = ClipToInt16(std::numeric_limits<int16_t>::min());
+  EXPECT_EQ(kMinBoundary, std::numeric_limits<int16_t>::min());
+}
+
+TEST(UnitFloatToInt16ScalarTest, ExtremeValues) {
+  const int16_t kMaxExceeded = UnitFloatToInt16Scalar(100000.0);
+  EXPECT_EQ(kMaxExceeded, std::numeric_limits<int16_t>::max());
+
+  const int16_t kMinExceeded = UnitFloatToInt16Scalar(-100000.0);
+  EXPECT_EQ(kMinExceeded, std::numeric_limits<int16_t>::min());
+}
+
+TEST(UnitFloatToInt16ScalarTest, RoundsTowardsZero) {
+  const int16_t kShouldRoundDownToZero = UnitFloatToInt16Scalar(1e-10);
+  EXPECT_EQ(kShouldRoundDownToZero, 0);
+
+  const int16_t kShouldRoundNegativeUpToZero = UnitFloatToInt16Scalar(-1e-10);
+  EXPECT_EQ(kShouldRoundNegativeUpToZero, 0);
+}
+
+TEST(UnitFloatToInt16ScalarTest, BoundariesMapToLimits) {
+  const int16_t kZero = UnitFloatToInt16Scalar(0.0);
+  EXPECT_EQ(kZero, 0);
+
+  const int16_t kMaxBoundary = UnitFloatToInt16Scalar(1.0);
+  EXPECT_EQ(kMaxBoundary, std::numeric_limits<int16_t>::max());
+
+  const int16_t kMinBoundary = UnitFloatToInt16Scalar(-1.0);
+  EXPECT_EQ(kMinBoundary, std::numeric_limits<int16_t>::min());
 }
 
 // Pair of input and output types to be tested for casting and their

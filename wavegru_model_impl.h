@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>  // NOLINT
 #include <vector>
 
 #include "absl/types/optional.h"
@@ -29,7 +30,7 @@
 #include "include/ghc/filesystem.hpp"
 #include "lyra_types.h"
 #include "lyra_wavegru.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -40,7 +41,7 @@ class WavegruModelImpl : public GenerativeModelInterface {
   // Returns a nullptr on failure.
   static std::unique_ptr<WavegruModelImpl> Create(
       int num_samples_per_hop, int num_features, int num_frames_per_packet,
-      const ghc::filesystem::path& model_path);
+      float silence_value, const ghc::filesystem::path& model_path);
 
   ~WavegruModelImpl() override;
 
@@ -65,6 +66,7 @@ class WavegruModelImpl : public GenerativeModelInterface {
                    const std::string& model_prefix, int num_threads,
                    int num_features, int num_cond_hiddens,
                    int num_samples_per_hop, int num_frames_per_packet,
+                   float silence_value,
                    std::unique_ptr<LyraWavegru<ComputeType>> wavegru,
                    std::unique_ptr<BufferMerger> buffer_merger);
 
@@ -73,7 +75,7 @@ class WavegruModelImpl : public GenerativeModelInterface {
 
   // The direct output samples from the model in the split domain.
   std::vector<std::vector<int16_t>> model_split_samples_;
-  std::vector<std::unique_ptr<csrblocksparse::Thread>> background_threads_;
+  std::vector<std::unique_ptr<std::thread>> background_threads_;
 
   std::unique_ptr<LyraWavegru<ComputeType>> wavegru_;
   std::unique_ptr<ConditioningType> conditioning_;

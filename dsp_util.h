@@ -21,7 +21,7 @@
 
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -33,7 +33,21 @@ absl::optional<float> LogSpectralDistance(
     const absl::Span<const float> second_log_spectrum);
 
 // Clip values above max value or below min value for int16_t.
+// The quantization scheme uses native c rounding (non-centered, decimal
+// truncation)
 int16_t ClipToInt16(float value);
+
+// Converts from a unit-float to a 16-bit integer.
+// If |unit_float| is in the [-1, 1) interval it will scale linearly to the
+// int16_t limits.  Values outside the interval are clipped to the limits.
+// The clipping, rounding, and quantization follows ClipToInt16().
+int16_t UnitFloatToInt16Scalar(float unit_float);
+
+// Converts from a Span of unit-floats to a vector of 16-bit integers.
+std::vector<int16_t> UnitFloatToInt16(absl::Span<const float> input);
+
+// Converts from a Span of 16-bit integers to a vector of unit-floats.
+std::vector<float> Int16ToUnitFloat(absl::Span<const int16_t> input);
 
 #if defined __aarch64__
 

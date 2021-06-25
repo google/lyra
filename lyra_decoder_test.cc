@@ -26,7 +26,7 @@
 #include <utility>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/memory/memory.h"
 #include "absl/random/random.h"
 #include "absl/strings/string_view.h"

@@ -25,7 +25,7 @@
 #include "absl/memory/memory.h"
 #include "glog/logging.h"
 #include "layer_wrapper.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {

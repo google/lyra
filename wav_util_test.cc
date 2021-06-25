@@ -14,8 +14,8 @@
 
 #include "wav_util.h"
 
-// placeholder for get runfiles header.
-// placeholder for testing header.
+// Placeholder for get runfiles header.
+// Placeholder for testing header.
 #include "absl/flags/flag.h"
 #include "absl/status/statusor.h"
 #include "gtest/gtest.h"

@@ -20,7 +20,7 @@
 #include <string>
 #include <variant>
 
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
