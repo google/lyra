@@ -23,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "Eigen/Core"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"

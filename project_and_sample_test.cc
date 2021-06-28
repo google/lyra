@@ -20,14 +20,14 @@
 #include <tuple>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/strings/str_format.h"
 #include "exported_layers_test.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_types.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -143,7 +143,7 @@ TYPED_TEST(ProjectAndSampleTest, GetSamplesReturnGoldenValues) {
           &this->scratch_space_, kNumSplitBands, actual_samples.data());
       barrier->barrier();
     };
-    LaunchOnThreadsWithBarrier(num_threads, f);
+    csrblocksparse::LaunchOnThreadsWithBarrier(num_threads, f);
     EXPECT_THAT(actual_samples,
                 testing::Pointwise(IsRelativelyClose(TestFixture::kTolerance),
                                    expected_samples));

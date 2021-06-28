@@ -38,7 +38,7 @@
 #include "layer_wrappers_lib.h"
 #include "lyra_types.h"
 #include "project_and_sample.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {

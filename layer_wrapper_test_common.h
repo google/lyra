@@ -26,7 +26,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "layer_wrappers_lib.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -140,7 +140,7 @@ void VerifyMultipleThreadsYeldSameResults(
       auto f = [&](csrblocksparse::SpinBarrier* spin_barrier, int tid) {
         layer->Run(tid, spin_barrier, output_view);
       };
-      LaunchOnThreadsWithBarrier(params.num_threads, f);
+      csrblocksparse::LaunchOnThreadsWithBarrier(params.num_threads, f);
       std::vector<float> saved_output(output_view.data(),
                                       output_view.data() + output_view.rows());
 

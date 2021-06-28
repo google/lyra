@@ -1,7 +1,6 @@
 # [internal] load cc_fuzz_target.bzl
 # [internal] load cc_proto_library.bzl
 # [internal] load android_cc_test:def.bzl
-# [internal] load open_source_rules.bzl
 
 package(default_visibility = [":__subpackages__"])
 
@@ -48,7 +47,7 @@ cc_library(
     name = "layer_wrapper_interface",
     hdrs = ["layer_wrapper_interface.h"],
     deps = [
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
     ],
 )
 
@@ -58,7 +57,7 @@ cc_library(
     deps = [
         ":dsp_util",
         ":layer_wrapper_interface",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_glog//:glog",
     ],
 )
@@ -68,7 +67,7 @@ cc_library(
     hdrs = ["conv1d_layer_wrapper.h"],
     deps = [
         ":layer_wrapper",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_glog//:glog",
     ],
@@ -79,7 +78,7 @@ cc_library(
     hdrs = ["dilated_convolutional_layer_wrapper.h"],
     deps = [
         ":layer_wrapper",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_glog//:glog",
     ],
@@ -90,7 +89,7 @@ cc_library(
     hdrs = ["transpose_convolutional_layer_wrapper.h"],
     deps = [
         ":layer_wrapper",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_glog//:glog",
     ],
@@ -114,7 +113,7 @@ cc_library(
         ":dsp_util",
         ":layer_wrappers_lib",
         ":lyra_types",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:span",
@@ -128,14 +127,12 @@ cc_library(
     hdrs = ["benchmark_decode_lib.h"],
     deps = [
         ":architecture_utils",
+        ":dsp_util",
         ":generative_model_interface",
         ":log_mel_spectrogram_extractor_impl",
         ":lyra_config",
         ":wavegru_model_impl",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/flags:parse",
-        "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
@@ -246,7 +243,7 @@ cc_library(
         ":generative_model_interface",
         ":lyra_types",
         ":lyra_wavegru",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/time",
@@ -275,7 +272,7 @@ cc_library(
         ":generative_model_interface",
         ":lyra_types",
         ":lyra_wavegru",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/time",
@@ -656,7 +653,7 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":layer_wrapper",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
     ],
 )
 
@@ -690,8 +687,8 @@ cc_library(
     ],
     data = glob(["wavegru/**"]),
     deps = [
-        ":sparse_inference_matrixvector",
         ":vector_quantizer_interface",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
@@ -733,7 +730,7 @@ cc_library(
         ":layer_wrappers_lib",
         ":lyra_types",
         ":project_and_sample",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
@@ -750,7 +747,7 @@ cc_library(
     copts = ["-O3"],
     deps = [
         ":lyra_types",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
@@ -827,36 +824,6 @@ cc_test(
     ],
 )
 
-cc_test(
-    name = "sparse_inference_matrixvector_test",
-    size = "small",
-    timeout = "short",
-    srcs = ["sparse_inference_matrixvector_test.cc"],
-    deps = [
-        ":sparse_inference_matrixvector",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "sparse_inference_matrixvector",
-    srcs = select({
-        ":android_config": ["lib/android_arm64/libsparse_inference.so"],
-        "//conditions:default": ["lib/linux_x86_64/libsparse_inference.so"],
-    }),
-    hdrs = ["sparse_inference_matrixvector.h"],
-    defines = [
-        "ACCURATE_TRANSCENDENTAL_APPROX",
-        "FAST_SAMPLING",
-        "FAST_TRANSCENDENTALS",
-        "SIGMOID_AS_TANH",
-    ],
-    deps = [
-        "@com_google_absl//absl/status",
-        "@com_google_glog//:glog",
-    ],
-)
-
 cc_binary(
     name = "encoder_main",
     srcs = [
@@ -926,7 +893,7 @@ cc_test(
         ":exported_layers_test",
         ":lyra_config",
         ":lyra_wavegru",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
@@ -945,7 +912,7 @@ cc_test(
     deps = [
         ":lyra_config",
         ":lyra_wavegru",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
@@ -964,7 +931,7 @@ cc_test(
     deps = [
         ":lyra_config",
         ":lyra_wavegru",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
@@ -998,7 +965,7 @@ cc_test(
         ":exported_layers_test",
         ":lyra_types",
         ":project_and_sample",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
@@ -1095,7 +1062,7 @@ cc_library(
     deps = [
         ":layer_wrappers_lib",
         ":lyra_types",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/random",
         "@com_google_googletest//:gtest",
         "@gulrak_filesystem//:filesystem",
@@ -1341,7 +1308,7 @@ cc_test(
         ":exported_layers_test",
         ":lyra_config",
         ":lyra_types",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
@@ -1357,7 +1324,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":layer_wrappers_lib",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/memory",
         "@com_google_googletest//:gtest",
     ],
@@ -1381,7 +1348,7 @@ cc_test(
         ":conv1d_layer_wrapper",
         ":layer_wrapper",
         ":layer_wrapper_test_common",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
     ],
@@ -1405,7 +1372,7 @@ cc_test(
         ":dilated_convolutional_layer_wrapper",
         ":layer_wrapper",
         ":layer_wrapper_test_common",
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
     ],
@@ -1428,8 +1395,8 @@ cc_test(
     deps = [
         ":layer_wrapper",
         ":layer_wrapper_test_common",
-        ":sparse_inference_matrixvector",
         ":transpose_convolutional_layer_wrapper",
+        "//sparse_matmul",
         "@com_google_googletest//:gtest_main",
         "@gulrak_filesystem//:filesystem",
     ],
@@ -1483,7 +1450,7 @@ cc_library(
     ],
     hdrs = ["dsp_util.h"],
     deps = [
-        ":sparse_inference_matrixvector",
+        "//sparse_matmul",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
         "@com_google_audio_dsp//audio/dsp:signal_vector_util",

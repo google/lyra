@@ -34,6 +34,7 @@
 #include "absl/types/span.h"
 #include "architecture_utils.h"
 #include "audio/dsp/signal_vector_util.h"
+#include "dsp_util.h"
 #include "generative_model_interface.h"
 #include "glog/logging.h"
 #include "include/ghc/filesystem.hpp"
@@ -113,7 +114,8 @@ int benchmark_decode(const int num_cond_vectors,
           chromemedia::codec::GetNumSamplesPerHop(
               chromemedia::codec::kInternalSampleRateHz),
           chromemedia::codec::kNumFeatures,
-          chromemedia::codec::kNumFramesPerPacket, model_path);
+          chromemedia::codec::kNumFramesPerPacket,
+          LogMelSpectrogramExtractorImpl::GetSilenceValue(), model_path);
 
   const int num_samples_per_hop = chromemedia::codec::GetNumSamplesPerHop(
       chromemedia::codec::kInternalSampleRateHz);
@@ -124,14 +126,18 @@ int benchmark_decode(const int num_cond_vectors,
       chromemedia::codec::LogMelSpectrogramExtractorImpl::Create(
           chromemedia::codec::kInternalSampleRateHz, kNumFeatures,
           num_samples_per_hop, num_samples_per_frame);
-  std::uniform_real_distribution<int16_t> distribution(
-      std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max());
+  // Generate a random signal.
+  // The characteristics of the signal are not so important, since this is
+  // testing benchmarking.  But it should have some variance since silent
+  // signals could potentially be handled differently.
+  std::uniform_real_distribution<float> distribution(-1.0, 1.0);
   std::default_random_engine generator;
   std::vector<int16_t> random_audio(num_samples_per_hop);
 
   for (int i = 0; i < num_cond_vectors; ++i) {
-    std::generate(random_audio.begin(), random_audio.end(),
-                  [&]() { return distribution(generator); });
+    std::generate(random_audio.begin(), random_audio.end(), [&]() {
+      return UnitFloatToInt16Scalar(distribution(generator));
+    });
     auto features_or =
         feature_extractor->Extract(absl::MakeConstSpan(random_audio));
     if (!features_or.has_value()) {

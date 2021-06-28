@@ -32,7 +32,7 @@
 #include "absl/time/time.h"
 #include "glog/logging.h"
 #include "lyra_types.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {

@@ -20,7 +20,7 @@
 #include <type_traits>
 
 #include "layer_wrapper.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {

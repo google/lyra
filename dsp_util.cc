@@ -50,5 +50,31 @@ int16_t ClipToInt16(float value) {
                   static_cast<float>(std::numeric_limits<int16_t>::max()));
 }
 
+int16_t UnitFloatToInt16Scalar(float unit_float) {
+  // First, scale unit_float linearly to int16 ranges.
+  // The unary negation is used here to scale by the negative min int16_t value,
+  // which has a greater absolute value than the max.
+  float int16_range_float =
+      unit_float * (-std::numeric_limits<int16_t>().min());
+  // If unit_float was outside the [-1, 1), clip to the min/max value.
+  return ClipToInt16(int16_range_float);
+}
+
+std::vector<int16_t> UnitFloatToInt16(absl::Span<const float> input) {
+  std::vector<int16_t> output;
+  output.reserve(input.size());
+  std::transform(input.begin(), input.end(), std::back_inserter(output),
+                 UnitFloatToInt16Scalar);
+  return output;
+}
+
+std::vector<float> Int16ToUnitFloat(absl::Span<const int16_t> input) {
+  std::vector<float> output(input.size());
+  std::transform(input.begin(), input.end(), output.begin(), [](int16_t x) {
+    return -static_cast<float>(x) / std::numeric_limits<int16_t>().min();
+  });
+  return output;
+}
+
 }  // namespace codec
 }  // namespace chromemedia

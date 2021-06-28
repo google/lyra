@@ -1,15 +1,27 @@
-# By default, the linux x86 platform is targeted.
+# By default, the host platform is targeted with the default c toolchain,
+# likely using gcc/libstdc++ on Linux.
+#
 # To select the android ARM64 platform, build with `--config=android_arm64`
 #
-# Both platforms require an external toolchain (NDK or clang/libc++) that
+# The Android platform and the clang toolchain requires an external
+# toolchain (NDK with clang/libc++) that
 # needs setup by the user.  See README.md for instructions.
+#
+# If clang/libc++ is installed to /usr/local/ it can be used with linux builds
+# instead of the default (gcc) by building with `--config=clang_toolchain`.
+# Since this will provide no specific advantages for most users, and the process
+# of installing a specific clang toolchain is a bit involved, the documentation
+# for clang toolchain setup is in toolchain/
 
-build --crosstool_top=//toolchain:clang_suite
-build --cpu=k8
-
+build --cxxopt=-std=gnu++17
+build --linkopt=-lm
+build --cxxopt=-Wno-sign-compare
 # Use the default C++ toolchain to build the tools used during the
 # build.
 build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+
+build:clang_toolchain --crosstool_top=//toolchain:clang_suite
+build:clang_toolchain --cpu=k8
 
 # Android
 build:android_arm64 --cpu=arm64-v8a

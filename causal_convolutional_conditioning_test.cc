@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/types/span.h"
 #include "exported_layers_test.h"
 #include "gmock/gmock.h"
@@ -27,7 +27,7 @@
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
 #include "lyra_types.h"
-#include "sparse_inference_matrixvector.h"
+#include "sparse_matmul/sparse_matmul.h"
 
 namespace chromemedia {
 namespace codec {
@@ -86,7 +86,7 @@ class CausalConvolutionalConditioningPeer {
                                       const std::string& prefix)
       : conditioning_stack_(feature_depth, num_cond_hiddens, num_hiddens,
                             num_samples_per_hop, num_frames_per_packet,
-                            num_threads, path, prefix) {}
+                            num_threads, 0.0f, path, prefix) {}
 
   void Precompute(const csrblocksparse::FatCacheAlignedVector<float>& input,
                   int num_threads) {
@@ -241,10 +241,10 @@ TYPED_TEST(CausalConvolutionalConditioningTest,
 
   ConditioningType no_multithreading(
       kFeatures.at(0).size(), kNumCondHiddens, kNumHiddens, kNumSamplesPerHop,
-      kNumFramesPerPacket, 1, this->testdata_dir_.string(), "lyra");
+      kNumFramesPerPacket, 1, 0.0f, this->testdata_dir_.string(), "lyra");
   ConditioningType two_threads(
       kFeatures.at(0).size(), kNumCondHiddens, kNumHiddens, kNumSamplesPerHop,
-      kNumFramesPerPacket, 2, this->testdata_dir_.string(), "lyra");
+      kNumFramesPerPacket, 2, 0.0f, this->testdata_dir_.string(), "lyra");
   csrblocksparse::FatCacheAlignedVector<float> input(kFeatures.at(0).size(), 1);
   for (int i = 0; i < kFeatures.size(); ++i) {
     std::copy(kFeatures.at(i).begin(), kFeatures.at(i).end(), input.data());
@@ -278,12 +278,12 @@ TYPED_TEST(CausalConvolutionalConditioningTest,
                                                      {0.0f, 0.0f, 0.0f}};
   ConditioningType one_frame_conditioning(
       kFeatures.at(0).size(), kNumCondHiddens, kNumHiddens, kNumSamplesPerHop,
-      /*num_frames_per_packet=*/1, kNumThreads, this->testdata_dir_.string(),
-      "lyra");
+      /*num_frames_per_packet=*/1, kNumThreads, 0.0f,
+      this->testdata_dir_.string(), "lyra");
   ConditioningType two_frames_conditioning(
       kFeatures.at(0).size(), kNumCondHiddens, kNumHiddens, kNumSamplesPerHop,
-      /*num_frames_per_packet=*/2, kNumThreads, this->testdata_dir_.string(),
-      "lyra");
+      /*num_frames_per_packet=*/2, kNumThreads, 0.0f,
+      this->testdata_dir_.string(), "lyra");
   csrblocksparse::FatCacheAlignedVector<float> input(kFeatures.at(0).size(), 1);
 
   std::vector<float> one_frame_output_to_compare;

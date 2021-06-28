@@ -22,12 +22,12 @@
 #include "exported_layers_test.h"
 #endif  // !defined(USE_FIXED16) && !defined(USE_BFLOAT16)
 
-// placeholder for get runfiles header.
+// Placeholder for get runfiles header.
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
-#include "sparse_inference_matrixvector.h"  // IWYU pragma: keep
+#include "sparse_matmul/sparse_matmul.h"  // IWYU pragma: keep
 
 namespace chromemedia {
 namespace codec {
