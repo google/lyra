@@ -32,6 +32,12 @@ class ResamplerInterface {
   virtual std::vector<int16_t> Resample(absl::Span<const int16_t> audio) = 0;
 
   virtual void Reset() = 0;
+
+  virtual int input_sample_rate_hz() const = 0;
+
+  virtual int target_sample_rate_hz() const = 0;
+
+  virtual int samples_until_steady_state() const = 0;
 };
 
 }  // namespace codec

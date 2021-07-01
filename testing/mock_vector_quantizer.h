@@ -31,10 +31,11 @@ class MockVectorQuantizer : public VectorQuantizerInterface {
  public:
   ~MockVectorQuantizer() override {}
 
-  MOCK_METHOD(absl::optional<std::string>, Quantize,
-              (const std::vector<float>& features), (const, override));
+  MOCK_METHOD(std::optional<std::string>, Quantize,
+              (const std::vector<float>& features, int num_bits),
+              (const, override));
 
-  MOCK_METHOD(std::vector<float>, DecodeToLossyFeatures,
+  MOCK_METHOD(std::optional<std::vector<float>>, DecodeToLossyFeatures,
               (const std::string& quantized_features), (const, override));
 };
 

@@ -18,7 +18,7 @@
 #include <random>
 
 #include "absl/memory/memory.h"
-#include "glog/logging.h"
+#include "glog/logging.h"  // IWYU pragma: keep
 
 namespace chromemedia {
 namespace codec {

@@ -1,7 +1,0 @@
-sample_rate_hz: 16000
-events {
-  type: ENCODE
-  encode_params {
-    packet: "\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034"
-  }
-}

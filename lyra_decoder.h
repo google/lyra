@@ -19,18 +19,16 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
+#include <optional>
 #include <vector>
 
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "buffered_filter_interface.h"
+#include "feature_estimator_interface.h"
 #include "generative_model_interface.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_decoder_interface.h"
-#include "packet_interface.h"
-#include "packet_loss_handler_interface.h"
-#include "resampler_interface.h"
+#include "noise_estimator_interface.h"
 #include "vector_quantizer_interface.h"
 
 namespace chromemedia {
@@ -48,50 +46,32 @@ class LyraDecoder : public LyraDecoderInterface {
   ///                       rates are 8000, 16000, 32000 and 48000.
   /// @param num_channels Desired number of channels. Currently only 1 is
   ///                     supported.
-  /// @param bit_rate Desired bit rate. Currently only 3000 is supported.
   /// @param model_path Path to the model weights. The identifier in the
-  ///                   lyra_config.textproto has to coincide with the
+  ///                   lyra_config.binarypb has to coincide with the
   ///                   |kVersionMinor| constant in lyra_config.cc.
   /// @return A unique_ptr to a |LyraDecoder| if all desired params are
   ///         supported. Else it returns a nullptr.
   static std::unique_ptr<LyraDecoder> Create(
-      int sample_rate_hz, int num_channels, int bitrate,
+      int sample_rate_hz, int num_channels,
       const ghc::filesystem::path& model_path);
 
-  /// Parses a packet and prepares the decoder to decode samples from the
-  /// payload.
-  ///
-  /// If estimated features were added by |DecodePacketLoss| but not fully
-  /// decoded overwrites that estimated feature.
+  /// Parses a packet and prepares to decode samples from the payload.
   ///
   /// @param encoded Encoded packet as a span of bytes.
   /// @return True if the provided packet is a valid Lyra packet.
   bool SetEncodedPacket(absl::Span<const uint8_t> encoded) override;
 
-  /// Decodes audio from the most recently added packet.
+  /// Decodes samples.
   ///
-  /// @param num_samples Number of samples to decode. It has to be less than the
-  ///                    remaining available samples to be decoded at the sample
-  ///                    rate chosen at Create time, given that each packet
-  ///                    contains 40ms of data.
-  /// @return Vector of int16-formatted samples as long as there are enough
-  ///          remaining samples available. Else it returns nullopt.
-  absl::optional<std::vector<int16_t>> DecodeSamples(int num_samples) override;
-
-  /// Decodes audio in packet loss mode.
+  /// If more samples are requested for decoding than are available from the
+  /// payloads set by |SetEncodedPacket|, this will generate samples in packet
+  /// loss mode. Packet loss mode will first attempt to conceal the lost packets
+  /// and then transition to comfort noise.
   ///
-  /// Greedily decodes samples remaining from the last provided packet, then
-  /// estimates plausible features from previous ones and uses those to decode
-  /// additional samples.
+  /// @param num_samples Number of samples to decode.
   ///
-  /// @param num_samples Number of samples to decode. It may be any arbitrarily
-  ///                    large value, but decoding is an expensive process, so
-  ///                    for real time streaming applications it is recommended
-  ///                    to be equal to the size of the output audio buffer,
-  ///                    usually 10ms worth of samples.
-  /// @return Vector of int16-formatted samples. Returns nullopt on failure.
-  absl::optional<std::vector<int16_t>> DecodePacketLoss(
-      int num_samples) override;
+  /// @return Vector of int16-formatted samples, or nullopt on failure.
+  std::optional<std::vector<int16_t>> DecodeSamples(int num_samples) override;
 
   /// Getter for the sample rate in Hertz.
   ///
@@ -102,11 +82,6 @@ class LyraDecoder : public LyraDecoderInterface {
   ///
   /// @return Number of channels.
   int num_channels() const override;
-
-  /// Getter for the bitrate.
-  ///
-  /// @return Bitrate.
-  int bitrate() const override;
 
   /// Getter for the frame rate.
   ///
@@ -119,61 +94,71 @@ class LyraDecoder : public LyraDecoderInterface {
   bool is_comfort_noise() const override;
 
  private:
+  // Tracks the direction we are moving along |fade_progress_|.
+  enum FadeDirection {
+    kFadeToCNG = 1,
+    kFadeFromCNG = -1,
+  };
+
   LyraDecoder() = delete;
   LyraDecoder(std::unique_ptr<GenerativeModelInterface> generative_model,
               std::unique_ptr<GenerativeModelInterface> comfort_noise_generator,
               std::unique_ptr<VectorQuantizerInterface> vector_quantizer,
-              std::unique_ptr<PacketInterface> packet,
-              std::unique_ptr<PacketLossHandlerInterface> packet_loss_handler,
-              std::unique_ptr<ResamplerInterface> resampler, int sample_rate_hz,
-              int num_channels, int bitrate, int num_frames_per_packet);
+              std::unique_ptr<NoiseEstimatorInterface> noise_estimator,
+              std::unique_ptr<FeatureEstimatorInterface> feature_estimator,
+              std::unique_ptr<BufferedFilterInterface> resampler,
+              int external_sample_rate_hz, int num_channels);
 
-  absl::optional<std::vector<int16_t>> RunGenerativeModelForPacketLoss(
-      int num_samples);
+  // Runs the while loop for generating samples at the internal sample rate.
+  std::optional<std::vector<int16_t>> DecodeSamplesInternal(
+      int internal_num_samples_to_generate);
 
-  // Runs the Comfort Noise Generator and performs any necessary overlap between
-  // models.
-  absl::optional<std::vector<int16_t>>
-  RunComfortNoiseGeneratorWithNecessaryOverlap(
-      int num_samples, bool overlap_required,
-      const std::vector<float>& features,
-      const std::vector<int16_t>& generative_model_frame =
-          std::vector<int16_t>()) const;
+  // Overlaps hops using a cos^2 window.
+  // Returns true on success, false on failure.
+  bool MaybeOverlapAndInsert(FadeDirection fade_direction, int fade_progress,
+                             const std::vector<int16_t>& generative_model_hop,
+                             const std::vector<int16_t>& comfort_noise_hop,
+                             std::vector<int16_t>& result);
 
-  // Overlaps frames using a cos^2 window. |preceding_frame| will die down to
-  // zero and |following_frame| will rise up from 0 in the resultant overlapped
-  // frame. Returns a nullopt if input frames are not the same size.
-  absl::optional<std::vector<int16_t>> OverlapFrames(
-      const std::vector<int16_t>& preceding_frame,
-      const std::vector<int16_t>& following_frame) const;
+  // Runs the generative model and adds estimated features if needed.
+  std::optional<std::vector<int16_t>> RunGenerativeModel(int num_samples);
 
-  // Used to generate the time domain samples.
+  // Runs the comfort noise generator and adds estimated features if needed.
+  std::optional<std::vector<int16_t>> RunComfortNoiseGenerator(int num_samples);
+
+  // Generates time domain samples from conditioning features.
   std::unique_ptr<GenerativeModelInterface> generative_model_;
-  // Used to generate comfort noise.
+  // Generates comfort noise from background noise estimates.
   std::unique_ptr<GenerativeModelInterface> comfort_noise_generator_;
   // Used to get the conditioning features from the bit-stream.
   std::unique_ptr<VectorQuantizerInterface> vector_quantizer_;
-  // Used to get the unpack a packet into quantized bits.
-  std::unique_ptr<PacketInterface> packet_;
-  // Used to fill in the blanks when a packet is lost.
-  std::unique_ptr<PacketLossHandlerInterface> packet_loss_handler_;
-  // Used to go from the generative model sample rate to the one expected at the
-  // output.
-  std::unique_ptr<ResamplerInterface> resampler_;
+  // Estimates background noise for conditioning to the
+  // |comfort_noise_generator_|.
+  std::unique_ptr<NoiseEstimatorInterface> noise_estimator_;
+  // Used as conditioning for the |generative_model_| when more samples were
+  // requested than contained in received packets.
+  std::unique_ptr<FeatureEstimatorInterface> feature_estimator_;
+  // Resamples from the generative model sample rate to the external sampling
+  // rate.
+  std::unique_ptr<BufferedFilterInterface> resampler_;
 
-  const int sample_rate_hz_;
+  // The packet loss state is described by the following three variables:
+
+  // Ranges from [-num_samples_per_packet + 1, concealment_length].
+  // If less than zero, abs(|concealment_progress_|) indicates how many
+  // concealment samples until we will begin playing out a received packet.
+  // Otherwise tracks samples since we last played out a received packet.
+  int concealment_progress_;
+  // Ranges from [0, fade_duration_samples_]. 0 indicates we are only generating
+  // model output. |fade_duration_samples| indicates we are only generating
+  // comfort noise. Values in between indicate a fade is in progress.
+  int fade_progress_;
+  // Indicates if we are incrementing or decrementing |fade_progress|.
+  FadeDirection fade_direction_;
+
+  const int external_sample_rate_hz_;
   const int num_channels_;
-  const int bitrate_;
-  const int num_frames_per_packet_;
 
-  // The number of remaining samples to decode per packet expressed at the
-  // frequency of |kInternalSampleRateHz|.
-  int internal_num_samples_available_;
-  // Prevent users from calling |DecodeSamples| without having added a real
-  // encoded packet.
-  bool encoded_packet_set_;
-  // Used to trigger overlap when switching to or from comfort noise.
-  bool prev_frame_was_comfort_noise_;
   friend class LyraDecoderPeer;
 };
 

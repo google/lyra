@@ -17,9 +17,10 @@
 #ifndef LYRA_CODEC_NOISE_ESTIMATOR_INTERFACE_H_
 #define LYRA_CODEC_NOISE_ESTIMATOR_INTERFACE_H_
 
+#include <cstdint>
 #include <vector>
 
-#include "absl/types/optional.h"  // IWYU pragma: keep
+#include "absl/types/span.h"
 
 namespace chromemedia {
 namespace codec {
@@ -29,12 +30,11 @@ class NoiseEstimatorInterface {
  public:
   virtual ~NoiseEstimatorInterface() {}
 
-  virtual std::vector<float> NoiseEstimate() const = 0;
+  virtual bool ReceiveSamples(const absl::Span<const int16_t> samples) = 0;
 
-  virtual bool Update(const std::vector<float>& curr_power_db) = 0;
+  virtual std::vector<float> noise_estimate() const = 0;
 
-  virtual absl::optional<bool> IsSimilarNoise(
-      const std::vector<float>& curr_power_db) = 0;
+  virtual bool is_noise() const = 0;
 };
 
 }  // namespace codec

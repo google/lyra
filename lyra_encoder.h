@@ -19,17 +19,14 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "audio/linear_filters/biquad_filter.h"
-#include "denoiser_interface.h"
 #include "feature_extractor_interface.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_encoder_interface.h"
 #include "noise_estimator_interface.h"
-#include "packet_interface.h"
 #include "resampler_interface.h"
 #include "vector_quantizer_interface.h"
 
@@ -52,7 +49,8 @@ class LyraEncoder : public LyraEncoderInterface {
   ///                       rates are 8000, 16000, 32000 and 48000.
   /// @param num_channels Desired number of channels. Currently only 1 is
   ///                     supported.
-  /// @param bit_rate Desired bit rate. Currently only 3000 is supported.
+  /// @param bit_rate Desired bit rate. The supported bit rates are 3200, 6000
+  ///                 and 9200.
   /// @param enable_dtx Set to true if discontinuous transmission should be
   ///                   enabled.
   /// @param model_path Path to the model weights. The identifier in the
@@ -67,12 +65,18 @@ class LyraEncoder : public LyraEncoderInterface {
   /// Encodes the audio samples into a vector wrapped byte array.
   ///
   /// @param audio Span of int16-formatted samples. It is assumed to contain
-  ///              40ms of data at the sample rate chosen at Create time.
+  ///              20ms of data at the sample rate chosen at Create time.
   /// @return Encoded packet as a vector of bytes as long as the right amount of
   ///         data is provided. Else it returns nullopt. It also returns nullopt
   ///         if DTX is enabled and the packet is deemed to contain silence.
-  absl::optional<std::vector<uint8_t>> Encode(
+  std::optional<std::vector<uint8_t>> Encode(
       const absl::Span<const int16_t> audio) override;
+
+  /// Setter for the bitrate.
+  ///
+  /// @param bitrate Desired bitrate in bps.
+  /// @return True if the bitrate is supported and set correctly.
+  bool set_bitrate(int bitrate) override;
 
   /// Getter for the sample rate in Hertz.
   ///
@@ -100,26 +104,18 @@ class LyraEncoder : public LyraEncoderInterface {
               std::unique_ptr<FeatureExtractorInterface> feature_extractor,
               std::unique_ptr<NoiseEstimatorInterface> noise_estimator,
               std::unique_ptr<VectorQuantizerInterface> vector_quantizer,
-              std::unique_ptr<DenoiserInterface> denoiser,
-              std::unique_ptr<PacketInterface> packet, int sample_rate_hz,
-              int num_channels, int bitrate, int num_frames_per_packet,
+              int sample_rate_hz, int num_channels, int num_quantized_bits,
               bool enable_dtx);
-
-  absl::optional<std::vector<uint8_t>> EncodeInternal(
-      const absl::Span<const int16_t> audio, bool filter_audio);
 
   const std::unique_ptr<ResamplerInterface> resampler_;
   const std::unique_ptr<FeatureExtractorInterface> feature_extractor_;
   const std::unique_ptr<NoiseEstimatorInterface> noise_estimator_;
   const std::unique_ptr<VectorQuantizerInterface> vector_quantizer_;
-  const std::unique_ptr<DenoiserInterface> denoiser_;
-  std::unique_ptr<PacketInterface> packet_;
+
   const int sample_rate_hz_;
   const int num_channels_;
-  const int bitrate_;
-  const int num_frames_per_packet_;
+  int num_quantized_bits_;
   const bool enable_dtx_;
-  linear_filters::BiquadFilterCascade<float> second_order_sections_filter_;
   friend class LyraEncoderPeer;
 };
 

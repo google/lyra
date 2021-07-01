@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <utility>
+#include <tuple>
 #include <vector>
 
 #include "absl/types/span.h"
@@ -29,28 +29,30 @@ namespace chromemedia {
 namespace codec {
 
 class ResamplerSampleRateTest
-    : public testing::TestWithParam<std::pair<double, double>> {};
+    : public testing::TestWithParam<std::tuple<int, int>> {};
 
 TEST_P(ResamplerSampleRateTest, ResamplingWorksAllZeros) {
-  const double input_sample_rate = GetParam().first;
-  const double output_sample_rate = GetParam().second;
-  std::vector<int16_t> samples(GetNumSamplesPerHop(input_sample_rate), 0);
-  auto resampler = Resampler::Create(input_sample_rate, output_sample_rate);
+  const int input_sample_rate_hz = std::get<0>(GetParam());
+  const int output_sample_rate_hz = std::get<1>(GetParam());
+  std::vector<int16_t> samples(GetNumSamplesPerHop(input_sample_rate_hz), 0);
+  auto resampler =
+      Resampler::Create(input_sample_rate_hz, output_sample_rate_hz);
   const auto resampled = resampler->Resample(absl::MakeConstSpan(samples));
-  std::vector<int16_t> expected(GetNumSamplesPerHop(output_sample_rate), 0);
+  std::vector<int16_t> expected(GetNumSamplesPerHop(output_sample_rate_hz), 0);
   EXPECT_EQ(resampled, expected);
 }
 
-INSTANTIATE_TEST_SUITE_P(UpsampleAndDownsample, ResamplerSampleRateTest,
-                         testing::Values(std::make_pair(32000, 16000),
-                                         std::make_pair(16000, 32000)));
+INSTANTIATE_TEST_SUITE_P(
+    UpsampleAndDownsample, ResamplerSampleRateTest,
+    testing::Combine(::testing::Values(kInternalSampleRateHz),
+                     ::testing::ValuesIn(kSupportedSampleRates)));
 
 TEST(ResamplerTest, UpsampleThenDownsampleSimilar) {
-  const double base_sample_rate = 16000;
-  const double upsample_sample_rate = 32000;
+  const double base_sample_rate_hz = 16000;
+  const double upsample_sample_rate_hz = 32000;
 
   std::vector<double> doubles_samples;
-  audio_dsp::ComputeSineWaveVector(1000, base_sample_rate, 0.0, 100,
+  audio_dsp::ComputeSineWaveVector(1000, base_sample_rate_hz, 0.0, 100,
                                    &doubles_samples);
   std::vector<int16_t> samples;
   for (auto val : doubles_samples) {
@@ -58,11 +60,12 @@ TEST(ResamplerTest, UpsampleThenDownsampleSimilar) {
   }
 
   // Upsample.
-  auto resampler = Resampler::Create(base_sample_rate, upsample_sample_rate);
+  auto resampler =
+      Resampler::Create(base_sample_rate_hz, upsample_sample_rate_hz);
   const auto upsampled = resampler->Resample(absl::MakeConstSpan(samples));
 
   // Downsample.
-  resampler = Resampler::Create(upsample_sample_rate, base_sample_rate);
+  resampler = Resampler::Create(upsample_sample_rate_hz, base_sample_rate_hz);
   const auto downsampled = resampler->Resample(absl::MakeConstSpan(upsampled));
 
   // Formula for delay:

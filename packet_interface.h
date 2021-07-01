@@ -18,10 +18,10 @@
 #define LYRA_CODEC_PACKET_INTERFACE_H_
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"
 
 namespace chromemedia {
@@ -38,7 +38,7 @@ class PacketInterface {
 
   // Unpacks an encoded packet received over the wire to quantized bits in the
   // form of a string.
-  virtual absl::optional<std::string> UnpackPacket(
+  virtual std::optional<std::string> UnpackPacket(
       const absl::Span<const uint8_t> packet) = 0;
 
   virtual int PacketSize() const = 0;

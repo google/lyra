@@ -14,72 +14,56 @@
 
 #include "lyra_components.h"
 
-#include <cstdint>
 #include <memory>
-#include <vector>
 
-#include "Eigen/Core"
-#include "absl/memory/memory.h"
 #include "feature_extractor_interface.h"
 #include "generative_model_interface.h"
-#include "log_mel_spectrogram_extractor_impl.h"
+#include "lyra_gan_model.h"
 #include "packet.h"
 #include "packet_interface.h"
-#include "vector_quantizer_impl.h"
+#include "residual_vector_quantizer.h"
+#include "soundstream_encoder.h"
 #include "vector_quantizer_interface.h"
-#include "wavegru_model_impl.h"
+#include "zero_feature_estimator.h"
 
 namespace chromemedia {
 namespace codec {
 namespace {
 
-// LINT.IfChange
-constexpr int kNumQuantizedBits = 120;
-constexpr int kNumHeaderBits = 0;
+//  LINT.IfChange
+constexpr int kMaxNumPacketBits = 184;
 // LINT.ThenChange(
 // lyra_config.cc,
+// residual_vector_quantizer.h,
 // )
 
 }  // namespace
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    int num_output_features, int num_bits,
-    const ghc::filesystem::path& model_path) {
-  return VectorQuantizerImpl::Create(num_output_features, num_bits, model_path);
-}
-
-std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    int num_features, int num_bits, const Eigen::RowVectorXf& mean_vector,
-    const Eigen::MatrixXf& transformation_matrix,
-    const std::vector<float>& code_vectors,
-    const std::vector<int16_t>& codebook_dimensions) {
-  return VectorQuantizerImpl::Create(num_features, num_bits, mean_vector,
-                                     transformation_matrix, code_vectors,
-                                     codebook_dimensions);
+    int num_output_features, const ghc::filesystem::path& model_path) {
+  return ResidualVectorQuantizer::Create(model_path);
 }
 
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
-    int num_samples_per_hop, int num_output_features, int num_frames_per_packet,
+    int num_samples_per_hop, int num_output_features,
     const ghc::filesystem::path& model_path) {
-  return WavegruModelImpl::Create(
-      num_samples_per_hop, num_output_features, num_frames_per_packet,
-      LogMelSpectrogramExtractorImpl::GetSilenceValue(), model_path);
+  return LyraGanModel::Create(model_path, num_output_features);
 }
 
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(
     int sample_rate_hz, int num_features, int num_samples_per_hop,
-    int num_samples_per_frame) {
-  return LogMelSpectrogramExtractorImpl::Create(
-      sample_rate_hz, num_features, num_samples_per_hop, num_samples_per_frame);
+    int num_samples_per_window, const ghc::filesystem::path& model_path) {
+  return SoundStreamEncoder::Create(model_path);
 }
 
-std::unique_ptr<PacketInterface> CreatePacket() {
-  return absl::make_unique<Packet<kNumQuantizedBits, kNumHeaderBits>>();
+std::unique_ptr<PacketInterface> CreatePacket(int num_header_bits,
+                                              int num_quantized_bits) {
+  return Packet<kMaxNumPacketBits>::Create(num_header_bits, num_quantized_bits);
 }
 
-absl::StatusOr<std::unique_ptr<DenoiserInterface>> CreateDenoiser(
-    const ghc::filesystem::path& model_path) {
-  return nullptr;
+std::unique_ptr<FeatureEstimatorInterface> CreateFeatureEstimator(
+    int num_features) {
+  return std::make_unique<ZeroFeatureEstimator>(num_features);
 }
 
 }  // namespace codec

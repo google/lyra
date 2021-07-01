@@ -21,4 +21,6 @@
           description="Label for button to record mic [CHAR_LIMIT=100]">Record from microphone</string>
   <string name="button_benchmark"
           description="Label for button to run benchmarks [CHAR_LIMIT=100]">Benchmark</string>
+  <string name="button_decode"
+          description="Label for button to decode to speaker [CHAR_LIMIT=100]">Encode/decode to speaker</string>
 </resources>

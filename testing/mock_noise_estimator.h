@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "absl/types/span.h"
 #include "gmock/gmock.h"
 #include "noise_estimator_interface.h"
 
@@ -29,12 +30,12 @@ class MockNoiseEstimator : public NoiseEstimatorInterface {
  public:
   ~MockNoiseEstimator() override {}
 
-  MOCK_METHOD(std::vector<float>, NoiseEstimate, (), (const, override));
-
-  MOCK_METHOD(bool, Update, (const std::vector<float>&), (override));
-
-  MOCK_METHOD(absl::optional<bool>, IsSimilarNoise, (const std::vector<float>&),
+  MOCK_METHOD(bool, ReceiveSamples, (const absl::Span<const int16_t> samples),
               (override));
+
+  MOCK_METHOD(std::vector<float>, noise_estimate, (), (const, override));
+
+  MOCK_METHOD(bool, is_noise, (), (const override));
 };
 
 }  // namespace codec

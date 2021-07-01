@@ -17,44 +17,66 @@
 #ifndef LYRA_CODEC_NOISE_ESTIMATOR_H_
 #define LYRA_CODEC_NOISE_ESTIMATOR_H_
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
-#include "absl/types/optional.h"
+#include "absl/types/span.h"
+#include "log_mel_spectrogram_extractor_impl.h"
 #include "noise_estimator_interface.h"
 
 namespace chromemedia {
 namespace codec {
 
-// This class estimates a noise vector from incoming packets which Wavenet can
-// generate noise from. The implementation is based on minimum statistics
-// estimation in the log frequency domain.
+// This class estimates a noise vector from incoming packets from which a
+// generative model can generate noise. The implementation is based on
+// minimum statistics estimation in the log frequency domain.
 class NoiseEstimator : public NoiseEstimatorInterface {
  public:
-  static std::unique_ptr<NoiseEstimator> Create(int num_features,
-                                                float num_seconds_per_frame);
+  static std::unique_ptr<NoiseEstimator> Create(int sample_rate_hz,
+                                                int num_samples_per_hop,
+                                                int num_samples_per_window,
+                                                int num_features);
+
+  // Buffers samples until a log mel spectrogram can be extracted.
+  // If the latest log mel spectrogram extracted is different enough from the
+  // current noise estimate, it updates the current noise estimate.
+  // Cumulative length of |samples| may never straddle a multiple of the
+  // number of samples per hop.
+  // Returns true on success, false on failure.
+  bool ReceiveSamples(const absl::Span<const int16_t> samples) override;
+
+  // Returns the minimum noise statistic estimate from the last extracted
+  // log mel spectrogram from |ReceiveSamples|.
+  std::vector<float> noise_estimate() const override;
+
+  // Returns whether the last log mel spectrogram extracted from
+  // |ReceiveSamples| is noise.
+  bool is_noise() const override;
+
+ private:
+  NoiseEstimator(int num_samples_per_hop, int num_hops_per_update,
+                 int num_features, float max_smoothing,
+                 float bound_decay_factor,
+                 std::unique_ptr<LogMelSpectrogramExtractorImpl>
+                     log_mel_spectrogram_extractor);
+
+  NoiseEstimator() = delete;
 
   // Calculates and stores the minimum noise statistics given the current power
   // per frequency band and the previous state.
-  bool Update(const std::vector<float>& curr_power_db) override;
+  void UpdateNoiseEstimate(const std::vector<float>& current_power_db);
 
-  // Returns the minimum noise statistic estimate.
-  std::vector<float> NoiseEstimate() const override;
-
-  // Identifies if current frame is similar to previously identified noise.
-  // Returns a nullopt if the size of curr_power_db does not match
-  // num_features_. Otherwise value is true if current frame is noise, false if
-  // not.
-  absl::optional<bool> IsSimilarNoise(
-      const std::vector<float>& curr_power_db) override;
-
- private:
-  NoiseEstimator(int num_features, int num_frames_per_update,
-                 float max_smoothing, float bound_decay_factor);
   void ComputeBounds();
 
-  const int num_features_;
-  const int num_frames_per_update_;
+  // Identifies if |current_power_db| is similar to previously identified
+  // noise.
+  bool ComputeIsNoise(const std::vector<float>& current_power_db);
+
+  void DecayBounds();
+
+  const int num_samples_per_hop_;
+  const int num_hops_per_update_;
   const float max_smoothing_;
   const float bound_decay_factor_;
   std::vector<float> smoothed_power_;
@@ -62,7 +84,16 @@ class NoiseEstimator : public NoiseEstimatorInterface {
   std::vector<float> tmp_min_smoothed_power_;
   std::vector<float> noise_estimate_;
   std::vector<float> noise_bound_;
-  int num_frames_received_ = 0;
+  std::vector<int16_t> past_samples_hop_;
+
+  bool is_noise_;
+  int num_hops_received_;
+  int next_sample_in_hop_;
+
+  std::unique_ptr<LogMelSpectrogramExtractorImpl>
+      log_mel_spectrogram_extractor_;
+
+  friend class NoiseEstimatorPeer;
 };
 
 }  // namespace codec

@@ -21,17 +21,38 @@
 #include <string>
 #include <vector>
 
+#include "absl/random/bit_gen_ref.h"
 #include "absl/strings/string_view.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_decoder.h"
+#include "packet_loss_model_interface.h"
 
 namespace chromemedia {
 namespace codec {
 
+// Used for custom command line flag in decoder_main.
+struct PacketLossPattern {
+  explicit PacketLossPattern(const std::vector<float>& starts,
+                             const std::vector<float>& durations)
+      : starts_(starts), durations_(durations) {}
+
+  std::vector<float> starts_;
+  std::vector<float> durations_;
+};
+
+std::string AbslUnparseFlag(chromemedia::codec::PacketLossPattern pattern);
+
+bool AbslParseFlag(absl::string_view text,
+                   chromemedia::codec::PacketLossPattern* p,
+                   std::string* error);
+
 // Decodes a vector of bytes into wav data.
-bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
-                    float packet_loss_rate, float average_burst_length,
-                    LyraDecoder* decoder, std::vector<int16_t>* decoded_audio);
+// If |packet_loss_model| is nullptr no packets will be lost.
+bool DecodeFeatures(const std::vector<uint8_t>& packet_stream, int packet_size,
+                    bool randomize_num_samples_requested, absl::BitGenRef gen,
+                    LyraDecoder* decoder,
+                    PacketLossModelInterface* packet_loss_model,
+                    std::vector<int16_t>* decoded_audio);
 
 // Decodes an encoded features file into a wav file.
 // Uses the model and quant files located under |model_path|.
@@ -42,7 +63,9 @@ bool DecodeFeatures(const std::vector<uint8_t>& packet_stream,
 // /tmp/lyra/encoded/file1_decoded.wav
 bool DecodeFile(const ghc::filesystem::path& encoded_path,
                 const ghc::filesystem::path& output_path, int sample_rate_hz,
+                int bitrate, bool randomize_num_samples_requested,
                 float packet_loss_rate, float average_burst_length,
+                const PacketLossPattern& fixed_packet_loss_pattern,
                 const ghc::filesystem::path& model_path);
 
 }  // namespace codec

@@ -19,9 +19,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "audio/dsp/mfcc/mel_filterbank.h"
 #include "audio/dsp/spectrogram/inverse_spectrogram.h"
 #include "generative_model_interface.h"
@@ -31,33 +31,29 @@ namespace codec {
 
 // This class generates comfort noise by estimating audio samples that
 // correspond to the given features.
-class ComfortNoiseGenerator : public GenerativeModelInterface {
+class ComfortNoiseGenerator : public GenerativeModel {
  public:
   // Returns a nullptr on failure.
   static std::unique_ptr<ComfortNoiseGenerator> Create(
-      int sample_rate_hz, int num_mel_bins, int window_length_samples,
-      int hop_length_samples);
+      int sample_rate_hz, int num_samples_per_hop, int window_length_samples,
+      int num_mel_bins);
 
   ~ComfortNoiseGenerator() override {}
 
-  void AddFeatures(const std::vector<float>& features) override;
-
-  absl::optional<std::vector<int16_t>> GenerateSamples(
-      int num_samples) override;
-
-  void Reset() override;
-
  private:
   ComfortNoiseGenerator(
-      int num_fft_bins, int sample_rate_hz, int num_mel_bins,
-      int hop_length_samples,
+      int sample_rate_hz, int num_samples_per_hop, int num_mel_bins,
       std::unique_ptr<audio_dsp::MelFilterbank> mel_filterbank,
       std::unique_ptr<audio_dsp::InverseSpectrogram> inverse_spectrogram);
+
+  bool RunConditioning(const std::vector<float>& features) override;
+
+  std::optional<std::vector<int16_t>> RunModel(int num_samples) override;
 
   // Estimates the Squared-Magnitude FFT that corresponds to the Log Mel
   // features. Returns true if the estimation completed successfully and false
   // otherwise.
-  bool FftFromFeatures();
+  void FftFromFeatures(const std::vector<float>& log_mel_features);
 
   // Produces time-domain inverse of a Squared-Magnitude FFT by adding a random
   // phase to each element. Returns true if the inversion completed successfully
@@ -66,10 +62,7 @@ class ComfortNoiseGenerator : public GenerativeModelInterface {
 
   const std::unique_ptr<const audio_dsp::MelFilterbank> mel_filterbank_;
   const std::unique_ptr<audio_dsp::InverseSpectrogram> inverse_spectrogram_;
-  const int num_fft_bins_;
-  const int num_mel_bins_;
-  const int hop_length_samples_;
-  std::vector<float> log_mel_features_;
+
   std::vector<double> squared_magnitude_fft_;
   std::vector<int16_t> reconstructed_samples_;
 };

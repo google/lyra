@@ -17,10 +17,9 @@
 #ifndef LYRA_CODEC_VECTOR_QUANTIZER_INTERFACE_H_
 #define LYRA_CODEC_VECTOR_QUANTIZER_INTERFACE_H_
 
+#include <optional>
 #include <string>
 #include <vector>
-
-#include "absl/types/optional.h"  // IWYU pragma: keep
 
 namespace chromemedia {
 namespace codec {
@@ -32,12 +31,12 @@ class VectorQuantizerInterface {
 
   // Converts the features into a bitset representing the indices of code
   // vectors closest to the klt transform of features.
-  virtual absl::optional<std::string> Quantize(
-      const std::vector<float>& features) const = 0;
+  virtual std::optional<std::string> Quantize(
+      const std::vector<float>& features, int num_bits) const = 0;
 
   // Converts quantized bits back into lossy features in the log mel
   // spectrogram domain.
-  virtual std::vector<float> DecodeToLossyFeatures(
+  virtual std::optional<std::vector<float>> DecodeToLossyFeatures(
       const std::string& quantized_features) const = 0;
 };
 

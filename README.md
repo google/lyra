@@ -2,7 +2,7 @@
 
 ## What is Lyra?
 
-[Lyra](https://ai.googleblog.com/2021/02/lyra-new-very-low-bitrate-codec-for.html)
+[Lyra](https://ai.googleblog.com/2021/08/soundstream-end-to-end-neural-audio.html)
 is a high-quality, low-bitrate speech codec that makes voice communication
 available even on the slowest networks. To do this it applies traditional codec
 techniques while leveraging advances in machine learning (ML) with models
@@ -12,27 +12,23 @@ and transmitting voice signals.
 ### Overview
 
 The basic architecture of the Lyra codec is quite simple. Features are extracted
-from speech every 40ms and are then compressed for transmission at a bitrate of
-3kbps. The features themselves are log mel spectrograms, a list of numbers
-representing the speech energy in different frequency bands, which have
-traditionally been used for their perceptual relevance because they are modeled
-after human auditory response. On the other end, a generative model uses those
-features to recreate the speech signal.
+from speech every 20ms and are then compressed for transmission at a desired
+bitrate between 3.2kbps and 9.2kbps. On the other end, a generative model uses
+those features to recreate the speech signal.
 
 Lyra harnesses the power of new natural-sounding generative models to maintain
 the low bitrate of parametric codecs while achieving high quality, on par with
 state-of-the-art waveform codecs used in most streaming and communication
 platforms today.
 
-Computational complexity is reduced by using a cheaper recurrent generative
-model, a WaveRNN variation, that works at a lower rate, but generates in
-parallel multiple signals in different frequency ranges that it later combines
-into a single output signal at the desired sample rate. This trick, plus 64-bit
-ARM optimizations, enables Lyra to not only run on cloud servers, but also
-on-device on mid-range phones, such as Pixel phones, in real time (with a
-processing latency of 100ms). This generative model is then trained on thousands
-of hours of speech data with speakers in over 70 languages and optimized to
-accurately recreate the input audio.
+Computational complexity is reduced by using a cheaper convolutional generative
+model called SoundStream, which enables Lyra to not only run on cloud servers,
+but also on-device on low-end phones in real time (with a processing latency of
+20ms). This whole system is then trained end-to-end on thousands of hours of
+speech data with speakers in over 90 languages and optimized to accurately
+recreate the input audio.
+
+Lyra is supported on Android, Linux, Mac and Windows.
 
 ## Prerequisites
 
@@ -41,15 +37,16 @@ There are a few things you'll need to do to set up your computer to build Lyra.
 ### Common setup
 
 Lyra is built using Google's build system, Bazel. Install it following these
-[instructions](https://docs.bazel.build/versions/master/install.html).
-Bazel verson 5.0.0 is required, and some Linux distributions may make an older
-version available in their application repositories, so make sure you are
-using the required version or newer. The latest version can be downloaded via
+[instructions](https://docs.bazel.build/versions/master/install.html). Bazel
+verson 5.0.0 is required, and some Linux distributions may make an older version
+available in their application repositories, so make sure you are using the
+required version or newer. The latest version can be downloaded via
 [Github](https://github.com/bazelbuild/bazel/releases).
 
-Lyra can be built from linux using bazel for an arm android target, or a linux
-target.  The android target is optimized for realtime performance.  The linux
-target is typically used for development and debugging.
+You will also need python3 and numpy installed.
+
+Lyra can be built from Linux using Bazel for an ARM Android target, or a Linux
+target, as well as Mac and Windows for native targets.
 
 ### Android requirements
 
@@ -58,36 +55,37 @@ toolchain. If you develop with Android Studio already, you might not need to do
 these steps if ANDROID_HOME and ANDROID_NDK_HOME are defined and pointing at the
 right version of the NDK.
 
-1. Download the sdk manager from https://developer.android.com/studio
-2. Unzip and cd to the directory
-3. Check the available packages to install in case they don't match the following steps.
+1.  Download command line tools from https://developer.android.com/studio
+2.  Unzip and cd to the directory
+3.  Check the available packages to install in case they don't match the
+    following steps.
 
-``` shell
-bin/sdkmanager  --sdk_root=$HOME/android/sdk --list
-```
+    ```shell
+    bin/sdkmanager  --sdk_root=$HOME/android/sdk --list
+    ```
 
-Some systems will already have the java runtime set up.  But if you see an error
-here like `ERROR: JAVA_HOME is not set and no 'java' command could be found
-on your PATH.`, this means you need to install the java runtime with `sudo apt
-install default-jdk` first. You will also need to add `export
-JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64` (type `ls /usr/lib/jvm` to see
-which path was installed) to your $HOME/.bashrc and reload it with `source
-$HOME/.bashrc`.
+    Some systems will already have the java runtime set up. But if you see an
+    error here like `ERROR: JAVA_HOME is not set and no 'java' command could be
+    found on your PATH.`, this means you need to install the java runtime with
+    `sudo apt install default-jdk` first. You will also need to add `export
+    JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64` (type `ls /usr/lib/jvm` to see
+    which path was installed) to your $HOME/.bashrc and reload it with `source
+    $HOME/.bashrc`.
 
-4. Install the r21 ndk, android sdk 30, and build tools:
+4.  Install the r21 ndk, android sdk 30, and build tools:
 
-``` shell
-bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-30" "build-tools;30.0.3" "ndk;21.4.7075529"
-```
+    ```shell
+    bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-30" "build-tools;30.0.3" "ndk;21.4.7075529"
+    ```
 
-5. Add the following to .bashrc (or export the variables)
+5.  Add the following to .bashrc (or export the variables)
 
-``` shell
-export ANDROID_NDK_HOME=$HOME/android/sdk/ndk/21.4.7075529
-export ANDROID_HOME=$HOME/android/sdk
-```
+    ```shell
+    export ANDROID_NDK_HOME=$HOME/android/sdk/ndk/21.4.7075529
+    export ANDROID_HOME=$HOME/android/sdk
+    ```
 
-6. Reload .bashrc (with `source $HOME/.bashrc`)
+6.  Reload .bashrc (with `source $HOME/.bashrc`)
 
 ## Building
 
@@ -96,7 +94,7 @@ platform.
 
 ### Building for Linux
 
-You can build the cc_binaries with the default config.  `encoder_main` is an
+You can build the cc_binaries with the default config. `encoder_main` is an
 example of a file encoder.
 
 ```shell
@@ -104,12 +102,12 @@ bazel build -c opt :encoder_main
 ```
 
 You can run `encoder_main` to encode a test .wav file with some speech in it,
-specified by `--input_path`.  The `--model_path` flag contains the model data
-necessary to encode, and `--output_path` specifies where to write the encoded
-(compressed) representation.
+specified by `--input_path`. The `--output_dir` specifies where to write the
+encoded (compressed) representation, and the desired bitrate can be specified
+using the `--bitrate` flag.
 
 ```shell
-bazel-bin/encoder_main --model_path=wavegru --output_dir=$HOME/temp --input_path=testdata/16khz_sample_000001.wav
+bazel-bin/encoder_main --input_path=testdata/16khz_sample_000001.wav --output_dir=$HOME/temp --bitrate=3200
 ```
 
 Similarly, you can build decoder_main and use it on the output of encoder_main
@@ -117,28 +115,29 @@ to decode the encoded data back into speech.
 
 ```shell
 bazel build -c opt :decoder_main
-bazel-bin/decoder_main  --model_path=wavegru --output_dir=$HOME/temp/ --encoded_path=$HOME/temp/16khz_sample_000001.lyra
+bazel-bin/decoder_main --encoded_path=$HOME/temp/16khz_sample_000001.lyra --output_dir=$HOME/temp/ --bitrate=3200
 ```
 
 Note: the default Bazel toolchain is automatically configured and likely uses
-gcc/libstdc++ on Linux.  This should be satisfactory for most users, but will
-differ from the NDK toolchain, which uses clang/libc++.  To use a custom clang
+gcc/libstdc++ on Linux. This should be satisfactory for most users, but will
+differ from the NDK toolchain, which uses clang/libc++. To use a custom clang
 toolchain on Linux, see toolchain/README.md and .bazelrc.
 
 ### Building for Android
 
 #### Android App
+
 There is an example APK target called `lyra_android_example` that you can build
 after you have set up the NDK.
 
-This example is an app with a minimal GUI that has buttons for two options.
-One option is to record from the microphone and encode/decode with Lyra so you
-can test what Lyra would sound like for your voice. The other option runs a
+This example is an app with a minimal GUI that has buttons for two options. One
+option is to record from the microphone and encode/decode with Lyra so you can
+test what Lyra would sound like for your voice. The other option runs a
 benchmark that encodes and decodes in the background and prints the timings to
 logcat.
 
 ```shell
-bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+bazel build -c opt android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
 adb install bazel-bin/android_example/lyra_android_example.apk
 ```
 
@@ -147,32 +146,24 @@ After this you should see an app called "Lyra Example App".
 You can open it, and you will see a simple TextView that says the benchmark is
 running, and when it finishes.
 
-Press "Record from microphone", say a few words (be sure to have your microphone
-near your mouth), and then press "Encode and decode to speaker". You should hear
-your voice being played back after being coded with Lyra.
+Press "Record from microphone", say a few words, and then press "Encode and
+decode to speaker". You should hear your voice being played back after being
+coded with Lyra.
 
 If you press 'Benchmark', you should see something like the following in logcat
-on a Pixel 4 when running the benchmark:
+on a Pixel 6 Pro when running the benchmark:
 
 ```shell
-I  Starting benchmarkDecode()
-I  I20210401 11:04:06.898649  6870 lyra_wavegru.h:75] lyra_wavegru running fast multiplication kernels for aarch64.
-I  I20210401 11:04:06.900411  6870 layer_wrapper.h:162] |lyra_16khz_ar_to_gates_| layer:  Shape: [3072, 4]. Sparsity: 0
-I  I20210401 11:04:07.031975  6870 layer_wrapper.h:162] |lyra_16khz_gru_layer_| layer:  Shape: [3072, 1024]. Sparsity: 0.9375
-...
-I  I20210401 11:04:26.700160  6870 benchmark_decode_lib.cc:167] Using float arithmetic.
-I  I20210401 11:04:26.700352  6870 benchmark_decode_lib.cc:85] conditioning_only stats for generating 2000 frames of audio, max: 506 us, min: 368 us, mean: 391 us, stdev: 10.3923.
-I  I20210401 11:04:26.725538  6870 benchmark_decode_lib.cc:85] model_only stats for generating 2000 frames of audio, max: 12690 us, min: 9087 us, mean: 9237 us, stdev: 262.416.
-I  I20210401 11:04:26.729460  6870 benchmark_decode_lib.cc:85] combined_model_and_conditioning stats for generating 2000 frames of audio, max: 13173 us, min: 9463 us, mean: 9629 us, stdev: 270.788.
-I  Finished benchmarkDecode()
+lyra_benchmark:  feature_extractor:  max: 0.685 ms  min: 0.206 ms  mean: 0.219 ms  stdev: 0.000 ms
+lyra_benchmark: quantizer_quantize:  max: 0.250 ms  min: 0.076 ms  mean: 0.082 ms  stdev: 0.000 ms
+lyra_benchmark:   quantizer_decode:  max: 0.152 ms  min: 0.027 ms  mean: 0.030 ms  stdev: 0.001 ms
+lyra_benchmark:       model_decode:  max: 0.560 ms  min: 0.223 ms  mean: 0.237 ms  stdev: 0.000 ms
+lyra_benchmark:              total:  max: 1.560 ms  min: 0.541 ms  mean: 0.569 ms  stdev: 0.005 ms
 ```
 
-This shows that decoding a 25Hz frame (each frame is .04 seconds) takes 9629
-microseconds on average (.0096 seconds).  So decoding is performed at around
-4.15 (.04/.0096) times faster than realtime.
-
-For even faster decoding, you can use a fixed point representation by building
-with `--copt=-DUSE_FIXED16`, although there may be some loss of quality.
+This shows that decoding a 50Hz frame (each frame is 20 milliseconds) takes
+0.569 milliseconds on average. So decoding is performed at around 35 (20/0.569)
+times faster than realtime.
 
 To build your own android app, you can either use the cc_library target outputs
 to create a .so that you can use in your own build system. Or you can use it
@@ -203,16 +194,38 @@ a binary through the shell.
 # Push the binary and the data it needs, including the model and .wav files:
 adb push bazel-bin/encoder_main /data/local/tmp/
 adb push bazel-bin/decoder_main /data/local/tmp/
-adb push wavegru/ /data/local/tmp/
+adb push model_coeffs/ /data/local/tmp/
 adb push testdata/ /data/local/tmp/
 
 adb shell
 cd /data/local/tmp
-./encoder_main --model_path=/data/local/tmp/wavegru --output_dir=/data/local/tmp --input_path=testdata/16khz_sample_000001.wav
-./decoder_main --model_path=/data/local/tmp/wavegru --output_dir=/data/local/tmp --encoded_path=16khz_sample_000001.lyra
+./encoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --input_path=testdata/16khz_sample_000001.wav
+./decoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --encoded_path=16khz_sample_000001.lyra
 ```
 
 The encoder_main/decoder_main as above should also work.
+
+### Building for Mac
+
+You will need to install the XCode command line tools in addition to the
+prerequisites common to all platforms. XCode setup is a required step for using
+Bazel on Mac. See this [guide](https://bazel.build/install/os-x) for how to
+install XCode command line tools. Lyra has been built successfully using XCode
+13.3.
+
+You can follow the instructions in the [Building for Linux](#building-for-linux)
+section once this is completed.
+
+### Building for Windows
+
+You will need to install Build Tools for Visual Studio 2019 in addition to the
+prerequisites common to all platforms. Visual Studio setup is a required step
+for building C++ for Bazel on Windows. See this
+[guide](https://bazel.build/install/windows) for how to install MSVC. You may
+also need to install python 3 support, which is also described in the guide.
+
+You can follow the instructions in the [Building for Linux](#building-for-linux)
+section once this is completed.
 
 ## API
 
@@ -232,8 +245,10 @@ class LyraEncoder : public LyraEncoderInterface {
       int sample_rate_hz, int num_channels, int bitrate, bool enable_dtx,
       const ghc::filesystem::path& model_path);
 
-  absl::optional<std::vector<uint8_t>> Encode(
+  std::optional<std::vector<uint8_t>> Encode(
       const absl::Span<const int16_t> audio) override;
+
+  bool set_bitrate(int bitrate) override;
 
   int sample_rate_hz() const override;
 
@@ -252,10 +267,13 @@ DTX should be enabled and where the model weights are stored. It also checks
 that these weights exist and are compatible with the current Lyra version.
 
 Given a `LyraEncoder`, any audio stream can be compressed using the `Encode`
-method. The provided span of int16-formatted samples is assumed to contain 40ms
+method. The provided span of int16-formatted samples is assumed to contain 20ms
 of data at the sample rate chosen at `Create` time. As long as this condition is
 met the `Encode` method returns the encoded packet as a vector of bytes that is
 ready to be stored or transmitted over the network.
+
+The bitrate can be dynamically modified using the `set_bitrate` setter. It
+returns true if the desired bitrate is supported and correctly set.
 
 The rest of the `LyraEncoder` methods are just getters for the different
 predetermined parameters.
@@ -267,21 +285,16 @@ using the following interface:
 class LyraDecoder : public LyraDecoderInterface {
  public:
   static std::unique_ptr<LyraDecoder> Create(
-      int sample_rate_hz, int num_channels, int bitrate,
+      int sample_rate_hz, int num_channels,
       const ghc::filesystem::path& model_path);
 
   bool SetEncodedPacket(absl::Span<const uint8_t> encoded) override;
 
-  absl::optional<std::vector<int16_t>> DecodeSamples(int num_samples) override;
-
-  absl::optional<std::vector<int16_t>> DecodePacketLoss(
-      int num_samples) override;
+  std::optional<std::vector<int16_t>> DecodeSamples(int num_samples) override;
 
   int sample_rate_hz() const override;
 
   int num_channels() const override;
-
-  int bitrate() const override;
 
   int frame_rate() const override;
 
@@ -290,27 +303,20 @@ class LyraDecoder : public LyraDecoderInterface {
 ```
 
 Once again, the static `Create` method instantiates a `LyraDecoder` with the
-desired sample rate in Hertz, number of channels and bitrate, as long as those
-parameters are supported. Else it returns a `nullptr`. These parameters don't
-need to be the same as the ones in `LyraEncoder`. And once again, the `Create`
-method also needs to know where the model weights are stored. It also checks
-that these weights exist and are compatible with the current Lyra version.
+desired sample rate in Hertz and number of channels, as long as those parameters
+are supported. Else it returns a `nullptr`. These parameters don't need to be
+the same as the ones in `LyraEncoder`. And once again, the `Create` method also
+needs to know where the model weights are stored. It also checks that these
+weights exist and are compatible with the current Lyra version.
 
 Given a `LyraDecoder`, any packet can be decoded by first feeding it into
 `SetEncodedPacket`, which returns true if the provided span of bytes is a valid
 Lyra-encoded packet.
 
-Then the int16-formatted samples can be obtained by calling `DecodeSamples`, as
-long as the total number of samples obtained this way between any two calls to
-`SetEncodedPacket` is less than 40ms of data at the sample rate chose at
-`Create` time.
-
-If there isn't a packet available, but samples still need to be generated,
-`DecodePacketLoss` can be used, which doesn't have a restriction on the number
-of samples.
-
-In those cases, the decoder might switch to a comfort noise generation mode,
-which can be checked using `is_confort_noise`.
+Then the int16-formatted samples can be obtained by calling `DecodeSamples`. If
+there isn't a packet available, but samples still need to be generated, the
+decoder might switch to a comfort noise generation mode, which can be checked
+using `is_comfort_noise`.
 
 The rest of the `LyraDecoder` methods are just getters for the different
 predetermined parameters.
@@ -319,16 +325,6 @@ For an example on how to use `LyraEncoder` and `LyraDecoder` to encode and
 decode a stream of audio, please refer to the
 [integration test](lyra_integration_test.cc).
 
-## Sparse Matrix Multiplication Library
-Lyra uses a library in the `sparse_matmul` directory that enables fast execution
-of sparse Matrix-Vector multiplication ops on mobile and desktop CPU platforms
-(ARM and AVX2) to allow for real-time operation on phones.  This library was
-created by DeepMind for their implementation of WaveRNN with sparsity [[4]](#4),
-which gave a huge improvement in complexity over WaveNet.
-
-A generic kernel is also provided, which enables debugging on non-optimized
-platforms.  Contributions for other platforms are welcome.
-
 ## License
 
 Use of this source code is governed by a Apache v2.0 license that can be found
@@ -336,18 +332,22 @@ in the LICENSE file.
 
 ## Papers
 
-1. Kleijn, W. B., Lim, F. S., Luebs, A., Skoglund, J., Stimberg, F., Wang, Q., &
-   Walters, T. C. (2018, April). [Wavenet based low rate speech coding](https://arxiv.org/pdf/1712.01120).
-   In 2018 IEEE international conference on acoustics, speech and signal
-   processing (ICASSP) (pp. 676-680). IEEE.
-2. Denton, T., Luebs, A., Lim, F. S., Storus, A., Yeh, H., Kleijn, W. B., &
-   Skoglund, J. (2021). [Handling Background Noise in Neural Speech Generation](https://arxiv.org/pdf/2102.11906).
-   arXiv preprint arXiv:2102.11906.
-3. Kleijn, W. B., Storus, A., Chinen, M., Denton, T., Lim, F. S., Luebs, A., ...
-   & Yeh, H. (2021). [Generative Speech Coding with Predictive Variance
-   Regularization](https://arxiv.org/pdf/2102.09660). arXiv preprint
-   arXiv:2102.09660.
-<a id="4">4.</a> Kalchbrenner, N., Elsen, E., Simonyan, K., Noury, S.,
-   Casagrande, N., Lockhart, E., ... & Kavukcuoglu, K. (2018, July).
-   [Efficient neural audio synthesis](https://arxiv.org/abs/1802.08435).
-   In International Conference on Machine Learning (pp. 2410-2419). PMLR.
+1.  Kleijn, W. B., Lim, F. S., Luebs, A., Skoglund, J., Stimberg, F., Wang, Q.,
+    & Walters, T. C. (2018, April).
+    [Wavenet based low rate speech coding](https://arxiv.org/pdf/1712.01120). In
+    2018 IEEE international conference on acoustics, speech and signal
+    processing (ICASSP) (pp. 676-680). IEEE.
+2.  Denton, T., Luebs, A., Chinen, M., Lim, F. S., Storus, A., Yeh, H., Kleijn,
+    W. B., & Skoglund, J. (2020, November).
+    [Handling Background Noise in Neural Speech Generation](https://arxiv.org/pdf/2102.11906).
+    In 2020 54th Asilomar Conference on Signals, Systems, and Computers (pp.
+    667-671). IEEE.
+3.  Kleijn, W. B., Storus, A., Chinen, M., Denton, T., Lim, F. S., Luebs, A.,
+    Skoglund, J., & Yeh, H. (2021, June).
+    [Generative speech coding with predictive variance regularization](https://arxiv.org/pdf/2102.09660).
+    In ICASSP 2021-2021 IEEE International Conference on Acoustics, Speech and
+    Signal Processing (ICASSP) (pp. 6478-6482). IEEE.
+4.  Zeghidour, N., Luebs, A., Omran, A., Skoglund, J., & Tagliasacchi, M.
+    (2021).
+    [SoundStream: An end-to-end neural audio codec](https://arxiv.org/pdf/2107.03312).
+    IEEE/ACM Transactions on Audio, Speech, and Language Processing.

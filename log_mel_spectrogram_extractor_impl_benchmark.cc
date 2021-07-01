@@ -14,7 +14,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "absl/random/random.h"
@@ -25,12 +24,12 @@
 static constexpr int kTestSampleRateHz = 16000;
 static constexpr int kNumMelBins = 10;
 
-void BenchmarkExtractFrames(benchmark::State& state, const int hop_length,
-                            const int window_length) {
+void BenchmarkExtractFeatures(benchmark::State& state, const int hop_length,
+                              const int window_length) {
   std::unique_ptr<chromemedia::codec::LogMelSpectrogramExtractorImpl>
       feature_extractor_ =
           chromemedia::codec::LogMelSpectrogramExtractorImpl::Create(
-              kTestSampleRateHz, kNumMelBins, hop_length, window_length);
+              kTestSampleRateHz, hop_length, window_length, kNumMelBins);
   // We create random audio vectors to avoid any caching in the benchmark.
   const int16_t num_rand_vectors = 10000;
   absl::BitGen gen;
@@ -44,29 +43,29 @@ void BenchmarkExtractFrames(benchmark::State& state, const int hop_length,
   }
 
   for (auto _ : state) {
-    auto features_or = feature_extractor_->Extract(
+    auto features = feature_extractor_->Extract(
         audio_vec[absl::Uniform(gen, 0, num_rand_vectors)]);
   }
 }
 
-void BM_ExtractSmallFrames(benchmark::State& state) {
-  BenchmarkExtractFrames(state, 6, 12);
+void BM_ExtractSmallFeatures(benchmark::State& state) {
+  BenchmarkExtractFeatures(state, 6, 12);
 }
 
-void BM_ExtractMediumFrames(benchmark::State& state) {
-  BenchmarkExtractFrames(state, 480, 960);
+void BM_ExtractMediumFeatures(benchmark::State& state) {
+  BenchmarkExtractFeatures(state, 480, 960);
 }
 
-void BM_ExtractLargeFrames(benchmark::State& state) {
-  BenchmarkExtractFrames(state, 2400, 4800);
+void BM_ExtractLargeFeatures(benchmark::State& state) {
+  BenchmarkExtractFeatures(state, 2400, 4800);
 }
 
-void BM_ExtractMediumFramesLongWindows(benchmark::State& state) {
-  BenchmarkExtractFrames(state, 480, 4800);
+void BM_ExtractMediumFeaturesLongWindows(benchmark::State& state) {
+  BenchmarkExtractFeatures(state, 480, 4800);
 }
 
-BENCHMARK(BM_ExtractSmallFrames);
-BENCHMARK(BM_ExtractMediumFrames);
-BENCHMARK(BM_ExtractLargeFrames);
-BENCHMARK(BM_ExtractMediumFramesLongWindows);
+BENCHMARK(BM_ExtractSmallFeatures);
+BENCHMARK(BM_ExtractMediumFeatures);
+BENCHMARK(BM_ExtractLargeFeatures);
+BENCHMARK(BM_ExtractMediumFeaturesLongWindows);
 BENCHMARK_MAIN();

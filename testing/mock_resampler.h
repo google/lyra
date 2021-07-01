@@ -22,6 +22,7 @@
 
 #include "absl/types/span.h"
 #include "gmock/gmock.h"
+#include "resampler.h"
 #include "resampler_interface.h"
 
 namespace chromemedia {
@@ -29,12 +30,42 @@ namespace codec {
 
 class MockResampler : public ResamplerInterface {
  public:
+  MockResampler(int input_sample_rate_hz, int target_sample_rate_hz)
+      : resampler_(
+            Resampler::Create(input_sample_rate_hz, target_sample_rate_hz)) {
+    ON_CALL(*this, Resample)
+        .WillByDefault([this](absl::Span<const int16_t> audio) {
+          return resampler_->Resample(audio);
+        });
+    ON_CALL(*this, Reset).WillByDefault([this]() {
+      return resampler_->Reset();
+    });
+    ON_CALL(*this, target_sample_rate_hz).WillByDefault([this]() {
+      return resampler_->target_sample_rate_hz();
+    });
+    ON_CALL(*this, input_sample_rate_hz).WillByDefault([this]() {
+      return resampler_->input_sample_rate_hz();
+    });
+    ON_CALL(*this, samples_until_steady_state).WillByDefault([this]() {
+      return resampler_->samples_until_steady_state();
+    });
+  }
+
   ~MockResampler() override {}
 
   MOCK_METHOD(std::vector<int16_t>, Resample, (absl::Span<const int16_t> audio),
               (override));
 
   MOCK_METHOD(void, Reset, (), (override));
+
+  MOCK_METHOD(int, input_sample_rate_hz, (), (const override));
+
+  MOCK_METHOD(int, target_sample_rate_hz, (), (const override));
+
+  MOCK_METHOD(int, samples_until_steady_state, (), (const override));
+
+ private:
+  std::unique_ptr<Resampler> resampler_;
 };
 
 }  // namespace codec

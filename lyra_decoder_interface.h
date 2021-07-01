@@ -18,9 +18,9 @@
 #define LYRA_CODEC_LYRA_DECODER_INTERFACE_H_
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace chromemedia {
@@ -37,22 +37,14 @@ class LyraDecoderInterface {
   // Returns true on success.
   virtual bool SetEncodedPacket(absl::Span<const uint8_t> encoded) = 0;
 
-  // Decodes |num_samples| from |encoded| most recently added by
-  // |SetEncodedPacket|.
-  // Returns a nullopt on failure.
-  virtual absl::optional<std::vector<int16_t>> DecodeSamples(
-      int num_samples) = 0;
-
-  // Estimates an encoded packet, and decodes it.
-  // On success returns samples from the model, on failure returns nullptr.
-  virtual absl::optional<std::vector<int16_t>> DecodePacketLoss(
+  // Decodes |num_samples|.
+  // Returns nullopt on failure.
+  virtual std::optional<std::vector<int16_t>> DecodeSamples(
       int num_samples) = 0;
 
   virtual int sample_rate_hz() const = 0;
 
   virtual int num_channels() const = 0;
-
-  virtual int bitrate() const = 0;
 
   virtual int frame_rate() const = 0;
 
