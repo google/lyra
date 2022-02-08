@@ -74,16 +74,16 @@ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64` (type `ls /usr/lib/jvm` to see
 which path was installed) to your $HOME/.bashrc and reload it with `source
 $HOME/.bashrc`.
 
-4. Install the r23 ndk, android sdk 31, and build tools:
+4. Install the r21 ndk, android sdk 31, and build tools:
 
 ``` shell
-bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-31" "build-tools;31.0.0" "ndk;23.1.7779620"
+bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-31" "build-tools;31.0.0" "ndk;21.4.7075529"
 ```
 
 5. Add the following to .bashrc (or export the variables)
 
 ``` shell
-export ANDROID_NDK_HOME=$HOME/android/sdk/ndk/23.1.7779620
+export ANDROID_NDK_HOME=$HOME/android/sdk/ndk/21.4.7075529
 export ANDROID_HOME=$HOME/android/sdk
 ```
 
