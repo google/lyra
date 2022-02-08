@@ -1,16 +1,56 @@
+name: build
+
 on: [push, pull_request]
 
 jobs:
-  android-bin:
+  android-bin-arm64:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - run: bazel build -c opt :encoder_main --config=android_arm64
-      - run: bazel build -c opt :decoder_main --config=android_arm64
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build encoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :encoder_main --config=android_arm64
+      - name: build decoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :decoder_main --config=android_arm64
 
-  android-app:
+  android-app-arm64:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Build Android app
-        run: bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build android app
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+
+  linux-bin-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build encoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :encoder_main
+      - name: build decoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :decoder_main
+
+  darwin-bin-arm64:
+    runs-on: macos-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build encoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :encoder_main
+      - name: build decoder_main
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/23.1.7779620"
+          bazel build -c opt :decoder_main
