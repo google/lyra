@@ -3,7 +3,7 @@ name: build
 on: [push, pull_request]
 
 jobs:
-  android-bin-arm64:
+  android-bin:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -16,7 +16,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :decoder_main --config=android_arm64
-      - name: Move artifacts
+      - name: Copy artifacts
         run: |
           mkdir action-product
           cp -r wavegru action-product/
@@ -28,7 +28,7 @@ jobs:
           name: lyra-android-bin
           path: action-product
 
-  android-app-arm64:
+  android-app:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -37,7 +37,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
-      - name: Move artifacts
+      - name: Copy artifacts
         run: |
           mkdir action-product
           cp bazel-bin/android_example/lyra_android_example.apk action-product/lyra_example.apk
@@ -47,7 +47,7 @@ jobs:
           name: lyra-android-example
           path: action-product
 
-  linux-bin-amd64:
+  linux-amd64:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -60,7 +60,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :decoder_main
-      - name: Move artifacts
+      - name: Copy artifacts
         run: |
           mkdir action-product
           cp -r wavegru action-product/
@@ -72,7 +72,7 @@ jobs:
           name: lyra-linux-amd64
           path: action-product
 
-  darwin-bin-amd64:
+  macos-amd64:
     runs-on: macos-latest
     steps:
       - name: Checkout repo
@@ -85,7 +85,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :decoder_main
-      - name: Move artifacts
+      - name: Copy artifacts
         run: |
           mkdir action-product
           cp -r wavegru action-product/
