@@ -102,22 +102,31 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-      - name: Build encoder_main
+      - name: Show default shell
         run: |
-          set ANDROID_NDK_HOME="%ANDROID_HOME%\ndk\21.4.7075529"
+          echo $SHELL
+      - name: Build encoder_main
+        shell: bash
+        run: |
+          echo $SHELL
+          echo $ANDROID_NDK_HOME
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
+          echo $ANDROID_NDK_HOME
           bazel build -c opt :encoder_main
       - name: Build decoder_main
+        shell: bash
         run: |
-          set ANDROID_NDK_HOME="%ANDROID_HOME%\ndk\21.4.7075529"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :decoder_main
       - name: Move artifacts
+        shell: bash
         run: |
           mkdir action-product
-          xcopy wavegru action-product\
-          copy bazel-bin\encoder_main.exe action-product\lyra-encoder.exe
-          copy bazel-bin\decoder_main.exe action-product\lyra-decoder.exe
+          cp -r wavegru action-product/
+          cp bazel-bin/encoder_main.exe action-product/lyra-encoder.exe
+          cp bazel-bin/decoder_main.exe action-product/lyra-decoder.exe
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
