@@ -98,10 +98,12 @@ jobs:
           path: action-product
 
   windows-bin-amd64:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Build encoder_main
         run: |
           set ANDROID_NDK_HOME="%ANDROID_HOME%\ndk\21.4.7075529"
