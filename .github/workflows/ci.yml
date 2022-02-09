@@ -25,7 +25,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: lyra-android-arm64
+          name: lyra-android-bin
           path: action-product
 
   android-app-arm64:
@@ -40,12 +40,11 @@ jobs:
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp bazel-bin/android_example/lyra_android_example.apk ./action-product/
-          cp bazel-bin/android_example/lyra_android_example_unsigned.apk ./action-product/
+          cp bazel-bin/android_example/lyra_android_example.apk ./action-product/lyra_example.apk
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: android-example
+          name: lyra-android-example
           path: action-product
 
   linux-bin-amd64:
@@ -107,20 +106,20 @@ jobs:
         uses: mxschmitt/action-tmate@v3
       - name: Build encoder_main
         run: |
-          set ANDROID_NDK_HOME="%ANDROID_HOME%/ndk/21.4.7075529"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :encoder_main
       - name: Build decoder_main
         run: |
-          set ANDROID_NDK_HOME="%ANDROID_HOME%/ndk/21.4.7075529"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build -c opt :decoder_main
-      # - name: Move artifacts
-      #   run: |
-      #     mkdir action-product
-      #     cp -r wavegru ./action-product/
-      #     cp bazel-bin/encoder_main ./action-product/lyra-encoder
-      #     cp bazel-bin/decoder_main ./action-product/lyra-decoder
-      # - name: Upload artifact
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: lyra-android-arm64
-      #     path: action-product
+      - name: Move artifacts
+        run: |
+          mkdir action-product
+          cp -r wavegru ./action-product/
+          cp bazel-bin/encoder_main.exe ./action-product/lyra-encoder.exe
+          cp bazel-bin/decoder_main.exe ./action-product/lyra-decoder.exe
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: lyra-windows-amd64
+          path: action-product
