@@ -98,7 +98,7 @@ jobs:
           path: action-product
 
   windows-bin-amd64:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
