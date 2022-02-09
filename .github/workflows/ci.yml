@@ -96,39 +96,3 @@ jobs:
         with:
           name: lyra-macos-amd64
           path: action-product
-
-  windows-bin-amd64:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
-      - name: Show default shell
-        run: |
-          echo $SHELL
-      - name: Build encoder_main
-        shell: bash
-        run: |
-          echo $SHELL
-          echo $ANDROID_NDK_HOME
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          echo $ANDROID_NDK_HOME
-          bazel build -c opt :encoder_main
-      - name: Build decoder_main
-        shell: bash
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :decoder_main
-      - name: Move artifacts
-        shell: bash
-        run: |
-          mkdir action-product
-          cp -r wavegru action-product/
-          cp bazel-bin/encoder_main.exe action-product/lyra-encoder.exe
-          cp bazel-bin/decoder_main.exe action-product/lyra-decoder.exe
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: lyra-windows-amd64
-          path: action-product
