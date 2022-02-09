@@ -25,7 +25,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: lyra-android-arm64.zip
+          name: lyra-android-arm64
           path: action-product
 
   android-app-arm64:
@@ -37,8 +37,16 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      - name: Move artifacts
+        run: |
+          mkdir action-product
+          cp bazel-bin/android_example/lyra_android_example.apk ./action-product/
+          cp bazel-bin/android_example/lyra_android_example_unsigned.apk ./action-product/
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: android-example
+          path: action-product
 
   linux-bin-amd64:
     runs-on: ubuntu-latest
@@ -62,8 +70,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: lyra-linux-amd64.zip
-          path: action-product/*
+          name: lyra-linux-amd64
+          path: action-product
 
   darwin-bin-amd64:
     runs-on: macos-latest
@@ -87,5 +95,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: lyra-macos-amd64.zip
-          path: action-product/*
+          name: lyra-macos-amd64
+          path: action-product
