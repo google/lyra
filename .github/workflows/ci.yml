@@ -19,9 +19,9 @@ jobs:
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp -r wavegru ./action-product/
-          cp bazel-bin/encoder_main ./action-product/lyra-encoder
-          cp bazel-bin/decoder_main ./action-product/lyra-decoder
+          cp -r wavegru action-product/
+          cp bazel-bin/encoder_main action-product/lyra-encoder
+          cp bazel-bin/decoder_main action-product/lyra-decoder
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -40,7 +40,7 @@ jobs:
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp bazel-bin/android_example/lyra_android_example.apk ./action-product/lyra_example.apk
+          cp bazel-bin/android_example/lyra_android_example.apk action-product/lyra_example.apk
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -63,9 +63,9 @@ jobs:
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp -r wavegru ./action-product/
-          cp bazel-bin/encoder_main ./action-product/lyra-encoder
-          cp bazel-bin/decoder_main ./action-product/lyra-decoder
+          cp -r wavegru action-product/
+          cp bazel-bin/encoder_main action-product/lyra-encoder
+          cp bazel-bin/decoder_main action-product/lyra-decoder
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -88,9 +88,9 @@ jobs:
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp -r wavegru ./action-product/
-          cp bazel-bin/encoder_main ./action-product/lyra-encoder
-          cp bazel-bin/decoder_main ./action-product/lyra-decoder
+          cp -r wavegru action-product/
+          cp bazel-bin/encoder_main action-product/lyra-encoder
+          cp bazel-bin/decoder_main action-product/lyra-decoder
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -104,18 +104,18 @@ jobs:
         uses: actions/checkout@v2
       - name: Build encoder_main
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME\ndk\21.4.7075529"
+          set ANDROID_NDK_HOME="%ANDROID_HOME%\ndk\21.4.7075529"
           bazel build -c opt :encoder_main
       - name: Build decoder_main
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME\ndk\21.4.7075529"
+          set ANDROID_NDK_HOME="%ANDROID_HOME%\ndk\21.4.7075529"
           bazel build -c opt :decoder_main
       - name: Move artifacts
         run: |
           mkdir action-product
-          cp -r wavegru ./action-product/
-          cp bazel-bin/encoder_main.exe ./action-product/lyra-encoder.exe
-          cp bazel-bin/decoder_main.exe ./action-product/lyra-decoder.exe
+          xcopy wavegru action-product\
+          copy bazel-bin\encoder_main.exe action-product\lyra-encoder.exe
+          copy bazel-bin\decoder_main.exe action-product\lyra-decoder.exe
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
