@@ -3,41 +3,18 @@ name: build
 on: [push, pull_request]
 
 jobs:
-  android-bin:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
-      - name: Build encoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :encoder_main --config=android_arm64
-      - name: Build decoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :decoder_main --config=android_arm64
-      - name: Copy artifacts
-        run: |
-          mkdir action-product
-          cp -r wavegru action-product/
-          cp bazel-bin/encoder_main action-product/lyra-encoder
-          cp bazel-bin/decoder_main action-product/lyra-decoder
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: lyra-android-bin
-          path: action-product
-
-  android-app:
+  android-example:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
       - name: Build Android App
+        shell: bash
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
           bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
       - name: Copy artifacts
+        shell: bash
         run: |
           mkdir action-product
           cp bazel-bin/android_example/lyra_android_example.apk action-product/lyra_example.apk
@@ -47,52 +24,36 @@ jobs:
           name: lyra-android-example
           path: action-product
 
+  android-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
+        with:
+          platform: android
+          architecture: arm64
+          build-options: --config=android_arm64
+
   linux-amd64:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Build encoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :encoder_main
-      - name: Build decoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :decoder_main
-      - name: Copy artifacts
-        run: |
-          mkdir action-product
-          cp -r wavegru action-product/
-          cp bazel-bin/encoder_main action-product/lyra-encoder
-          cp bazel-bin/decoder_main action-product/lyra-decoder
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
         with:
-          name: lyra-linux-amd64
-          path: action-product
+          platform: linux
+          architecture: amd64
 
   macos-amd64:
     runs-on: macos-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Build encoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :encoder_main
-      - name: Build decoder_main
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build -c opt :decoder_main
-      - name: Copy artifacts
-        run: |
-          mkdir action-product
-          cp -r wavegru action-product/
-          cp bazel-bin/encoder_main action-product/lyra-encoder
-          cp bazel-bin/decoder_main action-product/lyra-decoder
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
         with:
-          name: lyra-macos-amd64
-          path: action-product
+          platform: macos
+          architecture: amd64
