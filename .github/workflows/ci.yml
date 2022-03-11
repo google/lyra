@@ -1,22 +1,59 @@
+name: build
+
 on: [push, pull_request]
 
 jobs:
-  android-bin:
+  android-example:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - run: bazel build -c opt :encoder_main --config=android_arm64
-      - run: bazel build -c opt :decoder_main --config=android_arm64
-
-  android-app:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Build Android app
-        run: bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
-      - name: Upload Android APK as artifact
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build Android App
+        shell: bash
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
+          bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+      - name: Copy artifacts
+        shell: bash
+        run: |
+          mkdir action-product
+          cp bazel-bin/android_example/lyra_android_example.apk action-product/lyra_example.apk
+      - name: Upload artifact
         uses: actions/upload-artifact@v2
-        if: github.repository_owner == 'google'
         with:
-          path: bazel-bin/android_example/lyra_android_example.apk
-          retention-days: 30
+          name: lyra-android-example
+          path: action-product
+
+  android-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
+        with:
+          platform: android
+          architecture: arm64
+          build-options: --config=android_arm64
+
+  linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
+        with:
+          platform: linux
+          architecture: amd64
+
+  macos-amd64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build and upload
+        uses: ./.github/actions/lyra-builder
+        with:
+          platform: macos
+          architecture: amd64

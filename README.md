@@ -42,7 +42,7 @@ There are a few things you'll need to do to set up your computer to build Lyra.
 
 Lyra is built using Google's build system, Bazel. Install it following these
 [instructions](https://docs.bazel.build/versions/master/install.html).
-Bazel verson 4.0.0 is required, and some Linux distributions may make an older
+Bazel verson 5.0.0 is required, and some Linux distributions may make an older
 version available in their application repositories, so make sure you are
 using the required version or newer. The latest version can be downloaded via
 [Github](https://github.com/bazelbuild/bazel/releases).
@@ -74,10 +74,10 @@ JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64` (type `ls /usr/lib/jvm` to see
 which path was installed) to your $HOME/.bashrc and reload it with `source
 $HOME/.bashrc`.
 
-4. Install the r21 ndk, android sdk 29, and build tools:
+4. Install the r21 ndk, android sdk 30, and build tools:
 
 ``` shell
-bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-29" "build-tools;29.0.3" "ndk;21.4.7075529"
+bin/sdkmanager  --sdk_root=$HOME/android/sdk --install  "platforms;android-30" "build-tools;30.0.3" "ndk;21.4.7075529"
 ```
 
 5. Add the following to .bashrc (or export the variables)
