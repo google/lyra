@@ -1,0 +1,37 @@
+name: lyra-builder
+
+description: Build lyra binary on different platforms
+
+inputs:
+  platform:
+    description: Platform to build
+    required: true
+  architecture:
+    description: Architecture to build
+    required: true
+  build-options:
+    description: Options in bazel build command
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
+        bazel build -c opt :encoder_main ${{ inputs.build-options }}
+    - shell: bash
+      run: |
+        export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
+        bazel build -c opt :decoder_main ${{ inputs.build-options }}
+    - shell: bash
+      run: |
+        mkdir action-product
+        cp -r wavegru action-product/
+        cp bazel-bin/encoder_main action-product/lyra-encoder
+        cp bazel-bin/decoder_main action-product/lyra-decoder
+    - uses: actions/upload-artifact@v2
+      with:
+        name: lyra-${{ inputs.platform }}-${{ inputs.architecture }}
+        path: action-product
