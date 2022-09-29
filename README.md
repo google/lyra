@@ -107,7 +107,7 @@ encoded (compressed) representation, and the desired bitrate can be specified
 using the `--bitrate` flag.
 
 ```shell
-bazel-bin/encoder_main --input_path=testdata/16khz_sample_000001.wav --output_dir=$HOME/temp --bitrate=3200
+bazel-bin/encoder_main --input_path=testdata/sample1_16kHz.wav --output_dir=$HOME/temp --bitrate=3200
 ```
 
 Similarly, you can build decoder_main and use it on the output of encoder_main
@@ -115,7 +115,7 @@ to decode the encoded data back into speech.
 
 ```shell
 bazel build -c opt :decoder_main
-bazel-bin/decoder_main --encoded_path=$HOME/temp/16khz_sample_000001.lyra --output_dir=$HOME/temp/ --bitrate=3200
+bazel-bin/decoder_main --encoded_path=$HOME/temp/sample1_16kHz.lyra --output_dir=$HOME/temp/ --bitrate=3200
 ```
 
 Note: the default Bazel toolchain is automatically configured and likely uses
@@ -199,8 +199,8 @@ adb push testdata/ /data/local/tmp/
 
 adb shell
 cd /data/local/tmp
-./encoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --input_path=testdata/16khz_sample_000001.wav
-./decoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --encoded_path=16khz_sample_000001.lyra
+./encoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --input_path=testdata/sample1_16kHz.wav
+./decoder_main --model_path=/data/local/tmp/model_coeffs --output_dir=/data/local/tmp --encoded_path=sample1_16kHz.lyra
 ```
 
 The encoder_main/decoder_main as above should also work.
