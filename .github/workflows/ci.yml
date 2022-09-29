@@ -8,8 +8,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Setup NDK
-        uses: ./.github/actions/setup-ndk
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Setup Lyra dependencies
+        uses: ./.github/actions/setup-lyra-deps
       - name: Build Android App
         shell: bash
         run: |
@@ -31,8 +35,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Setup NDK
-        uses: ./.github/actions/setup-ndk
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Setup Lyra dependencies
+        uses: ./.github/actions/setup-lyra-deps
       - name: Build and upload
         uses: ./.github/actions/lyra-builder
         with:
@@ -45,8 +53,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Setup NDK
-        uses: ./.github/actions/setup-ndk
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Setup Lyra dependencies
+        uses: ./.github/actions/setup-lyra-deps
       - name: Build and upload
         uses: ./.github/actions/lyra-builder
         with:
@@ -58,8 +70,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Setup NDK
-        uses: ./.github/actions/setup-ndk
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Setup Lyra dependencies
+        uses: ./.github/actions/setup-lyra-deps
       - name: Build and upload
         uses: ./.github/actions/lyra-builder
         with:
