@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "absl/types/span.h"
@@ -31,7 +32,7 @@ static constexpr int kTestSampleRateHz = 16000;
 static constexpr int kNumMelBins = 10;
 static constexpr int kHopLengthSamples = 5;
 static constexpr int kWindowLengthSamples = 10;
-static constexpr int kNumOutputMelBins = 3;
+static constexpr int kNumOutputMelFeatures = 3;
 
 static constexpr int16_t kWavData[] = {7954,   10085, 8733,   10844,  29949,
                                        -549,   20833, 30345,  18086,  11375,
@@ -61,43 +62,41 @@ class LogMelSpectrogramExtractorImplTest : public testing::Test {
  protected:
   void SetUp() override {
     feature_extractor_ = LogMelSpectrogramExtractorImpl::Create(
-        kTestSampleRateHz, kNumMelBins, kHopLengthSamples,
-        kWindowLengthSamples);
+        kTestSampleRateHz, kHopLengthSamples, kWindowLengthSamples,
+        kNumMelBins);
     ASSERT_NE(feature_extractor_, nullptr);
   }
 
   std::unique_ptr<LogMelSpectrogramExtractorImpl> feature_extractor_;
 };
 
-TEST_F(LogMelSpectrogramExtractorImplTest, ThreeFramesEqualExpected) {
-  for (int i = 0; i < kNumOutputMelBins; ++i) {
-    const absl::Span<const int16_t> audio_frame = absl::MakeConstSpan(
+TEST_F(LogMelSpectrogramExtractorImplTest, ThreeFeaturesEqualExpected) {
+  for (int i = 0; i < kNumOutputMelFeatures; ++i) {
+    const absl::Span<const int16_t> audio = absl::MakeConstSpan(
         &kWavData[i * kHopLengthSamples], kHopLengthSamples);
 
-    auto features_or = feature_extractor_->Extract(audio_frame);
+    auto features = feature_extractor_->Extract(audio);
 
-    EXPECT_TRUE(features_or.has_value());
-    EXPECT_THAT(features_or.value(),
+    EXPECT_TRUE(features.has_value());
+    EXPECT_THAT(features.value(),
                 testing::Pointwise(testing::FloatEq(), kMelBins[i]));
   }
 }
 
-TEST_F(LogMelSpectrogramExtractorImplTest, FrameLongerThanExpected) {
-  std::vector<int16_t> audio_frame(kHopLengthSamples + 1);
+TEST_F(LogMelSpectrogramExtractorImplTest, SamplesLongerThanExpected) {
+  std::vector<int16_t> audio(kHopLengthSamples + 1);
 
-  auto features_or =
-      feature_extractor_->Extract(absl::MakeConstSpan(audio_frame));
+  auto features = feature_extractor_->Extract(absl::MakeConstSpan(audio));
 
-  EXPECT_FALSE(features_or.has_value());
+  EXPECT_FALSE(features.has_value());
 }
 
-TEST_F(LogMelSpectrogramExtractorImplTest, FrameShorterThanExpected) {
-  std::vector<int16_t> audio_frame(kWavData, kWavData + kHopLengthSamples - 1);
+TEST_F(LogMelSpectrogramExtractorImplTest, SamplesShorterThanExpected) {
+  std::vector<int16_t> audio(kWavData, kWavData + kHopLengthSamples - 1);
 
-  auto features_or =
-      feature_extractor_->Extract(absl::MakeConstSpan(audio_frame));
+  auto features = feature_extractor_->Extract(absl::MakeConstSpan(audio));
 
-  EXPECT_FALSE(features_or.has_value());
+  EXPECT_FALSE(features.has_value());
 }
 
 }  // namespace

@@ -27,6 +27,7 @@
                  android:label="@string/app_name"
                  android:theme="@style/AppTheme"
                  android:taskAffinity="">
+      <!-- Main Activity definition. -->
       <activity
           android:name="com.example.android.lyra.MainActivity"
           android:label="@string/app_name"

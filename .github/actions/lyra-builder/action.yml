@@ -28,7 +28,7 @@ runs:
     - shell: bash
       run: |
         mkdir action-product
-        cp -r wavegru action-product/
+        cp -r model_coeffs action-product/
         cp bazel-bin/encoder_main action-product/lyra-encoder
         cp bazel-bin/decoder_main action-product/lyra-decoder
     - uses: actions/upload-artifact@v2

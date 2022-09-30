@@ -20,11 +20,13 @@
 #include <memory>
 #include <random>
 
+#include "packet_loss_model_interface.h"
+
 namespace chromemedia {
 namespace codec {
 
 // Gilbert model to simulate packet loss bursts.
-class GilbertModel {
+class GilbertModel : public PacketLossModelInterface {
  public:
   static std::unique_ptr<GilbertModel> Create(float packet_loss_rate,
                                               float average_burst_length,
@@ -33,7 +35,7 @@ class GilbertModel {
   // Update the internal state according to the corresponding probabilities.
   // Returns true if the packet was received.
   // Returns false if the packet was lost.
-  bool IsPacketReceived();
+  bool IsPacketReceived() override;
 
  private:
   GilbertModel(float received2lost_probability, float lost2received_probability,

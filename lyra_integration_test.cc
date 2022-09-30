@@ -13,19 +13,18 @@
 // limitations under the License.
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
 
-#include "glog/logging.h"
 // Placeholder for get runfiles header.
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "dsp_util.h"
+#include "dsp_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
@@ -33,141 +32,121 @@
 #include "lyra_config.h"
 #include "lyra_decoder.h"
 #include "lyra_encoder.h"
-#include "wav_util.h"
+#include "wav_utils.h"
 
 namespace chromemedia {
 namespace codec {
 namespace {
 
 static constexpr absl::string_view kWavFiles[] = {
-    "48khz_sample_000003.wav", "32khz_sample_000002.wav",
-    "16khz_sample_000001.wav", "8khz_sample_000000.wav"};
+    "sample1_8kHz.wav", "sample1_16kHz.wav", "sample1_32kHz.wav",
+    "sample1_48kHz.wav"};
 
-class LyraIntegrationTest : public testing::TestWithParam<absl::string_view> {};
+class LyraIntegrationTest
+    : public testing::TestWithParam<testing::tuple<absl::string_view, int>> {};
 
 // This tests that decoded audio has similar features as the original.
 TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
   const ghc::filesystem::path wav_dir("testdata");
   const auto model_path =
-      ghc::filesystem::current_path() / std::string("wavegru");
+      ghc::filesystem::current_path() / std::string("model_coeffs");
 
-  const auto input_path =
-      ghc::filesystem::current_path() / wav_dir / std::string(GetParam());
+  const auto input_path = ghc::filesystem::current_path() / wav_dir /
+                          std::string(std::get<0>(GetParam()));
   absl::StatusOr<ReadWavResult> input_wav_result =
       Read16BitWavFileToVector(input_path);
   CHECK(input_wav_result.ok());
 
-  // Keep only two seconds of the input to shorten the test duration. The two
-  // seconds are taken from the middle to avoid the digital silence near the
-  // beginning and the end of each WAV file.
-  const int test_input_num_samples =
-      std::min(2 * input_wav_result->sample_rate_hz,
+  const int sample_rate_hz = input_wav_result->sample_rate_hz;
+  const int num_quantized_bits = std::get<1>(GetParam());
+  std::unique_ptr<LyraEncoder> encoder =
+      LyraEncoder::Create(sample_rate_hz, input_wav_result->num_channels,
+                          GetBitrate(num_quantized_bits),
+                          /*enable_dtx=*/false, model_path);
+  ASSERT_NE(encoder, nullptr);
+
+  std::unique_ptr<LyraDecoder> decoder = LyraDecoder::Create(
+      sample_rate_hz, input_wav_result->num_channels, model_path);
+  ASSERT_NE(decoder, nullptr);
+
+  // Keep only 3 seconds to shorten the test duration.
+  const int num_samples_per_hop = GetNumSamplesPerHop(sample_rate_hz);
+  const int num_samples_per_window = GetNumSamplesPerWindow(sample_rate_hz);
+  const int num_hops =
+      std::min(3 * sample_rate_hz / num_samples_per_hop,
                static_cast<int>(input_wav_result->samples.size()));
-  const int test_input_begin =
-      (input_wav_result->samples.size() - test_input_num_samples) / 2;
-  std::vector<int16_t> middle_samples(test_input_num_samples);
-  std::copy(input_wav_result->samples.begin() + test_input_begin,
-            (input_wav_result->samples.begin() + test_input_begin +
-             test_input_num_samples),
-            middle_samples.begin());
+  std::vector<int16_t> input(
+      input_wav_result->samples.begin(),
+      input_wav_result->samples.begin() + num_hops * num_samples_per_hop);
+  std::vector<int16_t> decoded_all;
+  decoded_all.reserve(input.size());
+  for (int hop_begin = 0; hop_begin < num_hops * num_samples_per_hop;
+       hop_begin += num_samples_per_hop) {
+    std::optional<std::vector<uint8_t>> encoded = encoder->Encode(
+        absl::MakeConstSpan(input.data() + hop_begin, num_samples_per_hop));
+    ASSERT_TRUE(encoded.has_value());
+    EXPECT_EQ(encoded.value().size(), GetPacketSize(num_quantized_bits));
 
-  std::unique_ptr<LyraEncoder> encoder = LyraEncoder::Create(
-      input_wav_result->sample_rate_hz, input_wav_result->num_channels,
-      kBitrate, /*enable_dtx=*/false, model_path);
-  ASSERT_NE(nullptr, encoder);
-  EXPECT_EQ(input_wav_result->sample_rate_hz, encoder->sample_rate_hz());
-  EXPECT_EQ(input_wav_result->num_channels, encoder->num_channels());
-  EXPECT_EQ(kBitrate, encoder->bitrate());
-
-  std::unique_ptr<LyraDecoder> decoder =
-      LyraDecoder::Create(input_wav_result->sample_rate_hz,
-                          input_wav_result->num_channels, kBitrate, model_path);
-  ASSERT_NE(nullptr, decoder);
-  EXPECT_EQ(input_wav_result->sample_rate_hz, decoder->sample_rate_hz());
-  EXPECT_EQ(input_wav_result->num_channels, decoder->num_channels());
-  EXPECT_EQ(kBitrate, decoder->bitrate());
-
-  const int num_samples_per_hop =
-      (input_wav_result->sample_rate_hz / encoder->frame_rate());
-  const int num_frames = middle_samples.size() / num_samples_per_hop;
-  middle_samples.resize(num_frames * num_samples_per_hop);
-  std::vector<int16_t> decoded;
-  decoded.reserve(middle_samples.size());
-  const int num_samples_per_packet = kNumFramesPerPacket * num_samples_per_hop;
-  for (int frame = 0; frame < num_frames; frame += kNumFramesPerPacket) {
-    absl::optional<std::vector<uint8_t>> encoded_or = encoder->Encode(
-        absl::MakeConstSpan(middle_samples.data() + num_samples_per_hop * frame,
-                            num_samples_per_packet));
-    ASSERT_TRUE(encoded_or.has_value());
-    EXPECT_EQ(encoded_or.value().size(), kPacketSize);
-
-    ASSERT_TRUE(decoder->SetEncodedPacket(encoded_or.value()));
-    absl::optional<std::vector<int16_t>> decoded_or =
-        decoder->DecodeSamples(num_samples_per_packet);
-    ASSERT_TRUE(decoded_or.has_value());
-    EXPECT_EQ(decoded_or.value().size(), num_samples_per_packet);
-    decoded.insert(decoded.end(), decoded_or.value().begin(),
-                   decoded_or.value().end());
+    ASSERT_TRUE(decoder->SetEncodedPacket(encoded.value()));
+    std::optional<std::vector<int16_t>> decoded =
+        decoder->DecodeSamples(num_samples_per_hop);
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded.value().size(), num_samples_per_hop);
+    decoded_all.insert(decoded_all.end(), decoded.value().begin(),
+                       decoded.value().end());
   }
 
   // We need separate feature extractors for input and decoded features because
   // the objects maintain an internal state.
   std::unique_ptr<LogMelSpectrogramExtractorImpl> input_extractor =
-      LogMelSpectrogramExtractorImpl::Create(input_wav_result->sample_rate_hz,
-                                             kNumFeatures, num_samples_per_hop,
-                                             2 * num_samples_per_hop);
-  ASSERT_NE(nullptr, input_extractor);
-
+      LogMelSpectrogramExtractorImpl::Create(
+          sample_rate_hz, num_samples_per_hop, num_samples_per_window,
+          kNumFeatures);
+  ASSERT_NE(input_extractor, nullptr);
   std::unique_ptr<LogMelSpectrogramExtractorImpl> decoded_extractor =
-      LogMelSpectrogramExtractorImpl::Create(input_wav_result->sample_rate_hz,
-                                             kNumFeatures, num_samples_per_hop,
-                                             2 * num_samples_per_hop);
-  ASSERT_NE(nullptr, decoded_extractor);
-
+      LogMelSpectrogramExtractorImpl::Create(
+          sample_rate_hz, num_samples_per_hop, num_samples_per_window,
+          kNumFeatures);
+  ASSERT_NE(decoded_extractor, nullptr);
   std::vector<std::vector<float>> input_log_mel_spectrogram;
   std::vector<std::vector<float>> decoded_log_mel_spectrogram;
-  for (int frame = 0; frame < num_frames; ++frame) {
-    absl::optional<std::vector<float>> input_features_or =
-        input_extractor->Extract(
-            absl::MakeConstSpan(&middle_samples.at(frame * num_samples_per_hop),
-                                num_samples_per_hop));
-    ASSERT_TRUE(input_features_or.has_value());
-    EXPECT_THAT(input_features_or,
-                testing::Optional(testing::SizeIs(kNumFeatures)));
-    input_log_mel_spectrogram.push_back(input_features_or.value());
+  for (int hop_begin = 0; hop_begin < num_hops * num_samples_per_hop;
+       hop_begin += num_samples_per_hop) {
+    std::optional<std::vector<float>> input_features = input_extractor->Extract(
+        absl::MakeConstSpan(&input.at(hop_begin), num_samples_per_hop));
+    ASSERT_TRUE(input_features.has_value());
+    EXPECT_THAT(input_features.value(), testing::SizeIs(kNumFeatures));
+    input_log_mel_spectrogram.push_back(input_features.value());
 
-    absl::optional<std::vector<float>> decoded_features_or =
+    std::optional<std::vector<float>> decoded_features =
         decoded_extractor->Extract(absl::MakeConstSpan(
-            &decoded.at(frame * num_samples_per_hop), num_samples_per_hop));
-    ASSERT_TRUE(decoded_features_or.has_value());
-    EXPECT_THAT(decoded_features_or,
-                testing::Optional(testing::SizeIs(kNumFeatures)));
-    decoded_log_mel_spectrogram.push_back(decoded_features_or.value());
+            &decoded_all.at(hop_begin), num_samples_per_hop));
+    ASSERT_TRUE(decoded_features.has_value());
+    EXPECT_THAT(decoded_features.value(), testing::SizeIs(kNumFeatures));
+    decoded_log_mel_spectrogram.push_back(decoded_features.value());
   }
   ASSERT_EQ(decoded_log_mel_spectrogram.size(),
             input_log_mel_spectrogram.size());
 
-  // Filling out the buffer because the conditioning stack has one frame
-  // look-ahead, which accounts for one frame of delay. The feature extractor's
-  // first frame uses padded zeros as well, adding 1 more frame.
-  static constexpr int kDelayInFrames = 2;
-  for (int frame = 0; frame < num_frames - kDelayInFrames; ++frame) {
+  // Compute spectral distances.
+  for (int hop = 0; hop < num_hops; ++hop) {
     absl::Span<const float> input_features =
-        absl::MakeConstSpan(input_log_mel_spectrogram.at(frame));
-    absl::Span<const float> decoded_features = absl::MakeConstSpan(
-        decoded_log_mel_spectrogram.at(frame + kDelayInFrames));
+        absl::MakeConstSpan(input_log_mel_spectrogram.at(hop));
+    absl::Span<const float> decoded_features =
+        absl::MakeConstSpan(decoded_log_mel_spectrogram.at(hop));
     EXPECT_EQ(input_features.size(), decoded_features.size());
-    const auto log_spectral_distance_or =
+    const auto log_spectral_distance =
         LogSpectralDistance(input_features, decoded_features);
-    ASSERT_TRUE(log_spectral_distance_or.has_value());
-    EXPECT_LT(log_spectral_distance_or.value(), 2.6f)
-        << "frame_index=" << frame;
+    ASSERT_TRUE(log_spectral_distance.has_value());
+    EXPECT_LT(log_spectral_distance.value(), 2.0f) << "hop=" << hop;
   }
 }
 }  // namespace
 
-INSTANTIATE_TEST_SUITE_P(InputPaths, LyraIntegrationTest,
-                         testing::ValuesIn(kWavFiles));
+INSTANTIATE_TEST_SUITE_P(
+    InputPathsAndQuantizedBits, LyraIntegrationTest,
+    testing::Combine(testing::ValuesIn(kWavFiles),
+                     testing::ValuesIn(GetSupportedQuantizedBits())));
 
 }  // namespace codec
 }  // namespace chromemedia

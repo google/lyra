@@ -16,132 +16,183 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <memory>
+#include <optional>
+#include <random>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "absl/types/optional.h"
-#include "gmock/gmock.h"
+#include "comfort_noise_generator.h"
+#include "dsp_utils.h"
 #include "gtest/gtest.h"
+#include "log_mel_spectrogram_extractor_impl.h"
+#include "lyra_config.h"
 
 namespace chromemedia {
 namespace codec {
+
+class NoiseEstimatorPeer {
+ public:
+  explicit NoiseEstimatorPeer(int num_samples_per_hop, int num_hops_per_update,
+                              int num_features, float max_smoothing,
+                              float bound_decay_factor,
+                              std::unique_ptr<LogMelSpectrogramExtractorImpl>
+                                  log_mel_spectrogram_extractor)
+      : noise_estimator_(num_samples_per_hop, num_hops_per_update, num_features,
+                         max_smoothing, bound_decay_factor,
+                         std::move(log_mel_spectrogram_extractor)) {}
+
+  void UpdateNoiseEstimate(const std::vector<float>& current_power_db) {
+    noise_estimator_.UpdateNoiseEstimate(current_power_db);
+  }
+
+  bool ComputeIsNoise(const std::vector<float>& current_power_db) {
+    return noise_estimator_.ComputeIsNoise(current_power_db);
+  }
+
+ private:
+  NoiseEstimator noise_estimator_;
+};
+
 namespace {
 
-static constexpr float kNumSecondsPerFrame = 0.025f;
-static const int kNumFramesPerSecond = std::round(1 / kNumSecondsPerFrame);
-static constexpr float kMaxAbsError = 1e-1f;
+static constexpr int kTestNumHops = 250;
 static constexpr int kTestNumFeatures = 160;
-static constexpr float kBoundHalfLifeSec = 1.f;
-static constexpr int kNumSeconds = 4;
+static constexpr int kTestNumSamplesPerWindow = 640;
+static constexpr int kTestNumSamplesPerHop = 320;
+static constexpr float kMaxPower = 1.f;
 
 class NoiseEstimatorTest : public ::testing::Test {
  protected:
   void SetUp() override {
     noise_estimator_ =
-        NoiseEstimator::Create(kTestNumFeatures, kNumSecondsPerFrame);
+        NoiseEstimator::Create(kInternalSampleRateHz, kTestNumSamplesPerHop,
+                               kTestNumSamplesPerWindow, kTestNumFeatures);
     ASSERT_NE(noise_estimator_, nullptr);
-  }
-
-  // Sparsely populates a vector with uniform power values.
-  std::vector<float> RandomSignal(const std::vector<float>& noise) {
-    // Each frequency bin has a 1 in 10 probability of containing a uniform
-    // signal.
-    const int kSignalProbability = 10;
-    const float kSignalPower = 1;
-    std::vector<float> signal(noise);
-    for (auto& sample : signal) {
-      int signal_prob = rand_r(&seed_) % kSignalProbability;
-      if (signal_prob == 0) {
-        sample = kSignalPower;
-      }
-    }
-    return signal;
   }
 
   // Adds a small amount of variability to the base noise.
   std::vector<float> RandomNoise(const std::vector<float>& base_noise) {
-    const float kNoiseVariability = 1e-1f;
+    const float kMaxAbsEnergy = 1e-1f;
+    std::uniform_real_distribution<float> noise_distribution(-kMaxAbsEnergy,
+                                                             kMaxAbsEnergy);
     std::vector<float> noise(base_noise);
-    for (auto& sample : noise) {
-      sample += -kNoiseVariability +
-                static_cast<float>(rand_r(&seed_)) /
-                    (static_cast<float>(RAND_MAX) / (2.f * kNoiseVariability));
+    for (auto& bin : noise) {
+      bin += noise_distribution(generator_);
     }
     return noise;
   }
 
-  // Noise approximated by a line across frequency bins.
+  std::vector<float> CreateNoiseWithSparsePower(
+      const std::vector<float>& noise) {
+    // Each frequency bin has a 1 in 10 probability of containing a uniform
+    // sparse_energy_noise.
+    const int kReciprocalPowerProbability = 10;
+    std::vector<float> sparse_energy_noise(noise);
+    std::uniform_int_distribution<int> bin_distribution(
+        0, kReciprocalPowerProbability);
+    for (auto& bin : sparse_energy_noise) {
+      if (bin_distribution(generator_) == 0) {
+        bin = kMaxPower;
+      }
+    }
+    return sparse_energy_noise;
+  }
+
+  // Create a noise vector in which power increases with frequency.
   std::vector<float> BaseNoise() {
-    const float kNoiseLowerBound = -2.f;
-    const float kNoiseUpperBound = -1.f;
     std::vector<float> noise(kTestNumFeatures);
     // Approximate the base noise with a line.
-    float rise = (kNoiseLowerBound - kNoiseUpperBound) / kTestNumFeatures;
+    float rise =
+        LogMelSpectrogramExtractorImpl::GetSilenceValue() / kTestNumFeatures;
     for (int i = 0; i < noise.size(); i++) {
-      noise.at(i) = rise * i + kNoiseUpperBound;
+      noise.at(i) =
+          rise * i + LogMelSpectrogramExtractorImpl::GetSilenceValue();
     }
     return noise;
+  }
+
+  void GenerateSamples(std::vector<float> noise_features,
+                       ComfortNoiseGenerator& noise_generator,
+                       std::vector<int16_t>* output) {
+    ASSERT_TRUE(noise_generator.AddFeatures(noise_features));
+    auto noise = noise_generator.GenerateSamples(kTestNumSamplesPerHop);
+    ASSERT_TRUE(noise.has_value());
+    // ASSERT_* macros have a hidden return, this function must return void.
+    output->assign(noise->begin(), noise->end());
   }
 
   std::unique_ptr<NoiseEstimator> noise_estimator_;
-  uint seed_ = 1;
+  std::default_random_engine generator_;
 };
 
-TEST_F(NoiseEstimatorTest, ThreeSecondsEstimate) {
-  const std::vector<float> kBaseNoise = BaseNoise();
-  std::vector<float> noise = RandomNoise(kBaseNoise);
+TEST_F(NoiseEstimatorTest, FiveSecondsSparseEnergy) {
+  auto noise_generator = ComfortNoiseGenerator::Create(
+      kInternalSampleRateHz, kTestNumSamplesPerHop, kTestNumSamplesPerWindow,
+      kTestNumFeatures);
+  ASSERT_NE(noise_generator, nullptr);
+  const std::vector<float> base_noise = BaseNoise();
+  std::vector<int16_t> samples;
 
-  ASSERT_TRUE(noise_estimator_->Update(noise));
-  // Do not add the uniform signal to the first frame.
-  for (int i = 1; i < kNumSeconds * kNumFramesPerSecond; ++i) {
-    noise = RandomNoise(kBaseNoise);
-    std::vector<float> signal = RandomSignal(noise);
-    ASSERT_TRUE(noise_estimator_->Update(signal));
+  for (int i = 0; i < kTestNumHops; ++i) {
+    const std::vector<float> sparse_energy_noise =
+        CreateNoiseWithSparsePower(base_noise);
+    GenerateSamples(sparse_energy_noise, *noise_generator, &samples);
+    ASSERT_TRUE(noise_estimator_->ReceiveSamples(samples));
   }
 
-  EXPECT_THAT(noise_estimator_->NoiseEstimate(),
-              testing::Pointwise(testing::FloatNear(kMaxAbsError), kBaseNoise));
+  auto spectral_distance =
+      LogSpectralDistance(base_noise, noise_estimator_->noise_estimate());
+  ASSERT_TRUE(spectral_distance.has_value());
+  EXPECT_LT(spectral_distance.value(), 0.7f);
+}
+
+TEST_F(NoiseEstimatorTest, FiveSecondsSilence) {
+  auto noise_generator = ComfortNoiseGenerator::Create(
+      kInternalSampleRateHz, kTestNumSamplesPerHop, kTestNumSamplesPerWindow,
+      kTestNumFeatures);
+  ASSERT_NE(noise_generator, nullptr);
+  std::vector<float> silence(kTestNumFeatures,
+                             LogMelSpectrogramExtractorImpl::GetSilenceValue());
+  std::vector<int16_t> samples;
+
+  for (int i = 0; i < kTestNumHops; ++i) {
+    GenerateSamples(silence, *noise_generator, &samples);
+    ASSERT_TRUE(noise_estimator_->ReceiveSamples(samples));
+    // The initial noise estimate of silence should not be updated.
+    auto spectral_distance =
+        LogSpectralDistance(silence, noise_estimator_->noise_estimate());
+    ASSERT_TRUE(spectral_distance.has_value());
+    EXPECT_LT(spectral_distance.value(), 0.2f)
+        << " Noise estimate dissimilar at frame index " << i;
+  }
 }
 
 TEST_F(NoiseEstimatorTest, NoiseIdentification) {
-  const std::vector<float> kBaseNoise = BaseNoise();
-
-  const std::vector<float> wrong_size_vector(kTestNumFeatures - 1);
-  EXPECT_FALSE(noise_estimator_->IsSimilarNoise(wrong_size_vector).has_value());
-
-  // Run noise through estimator first.
-  for (int i = 1; i < kNumSeconds * kNumFramesPerSecond; ++i) {
-    const std::vector<float> noise = RandomNoise(kBaseNoise);
-    ASSERT_TRUE(noise_estimator_->Update(noise));
+  auto feature_extractor = LogMelSpectrogramExtractorImpl::Create(
+      kInternalSampleRateHz, kTestNumSamplesPerHop, kTestNumSamplesPerWindow,
+      kTestNumFeatures);
+  const int kMaxSmoothingHalflifeHops = 20;
+  const int kBoundHalfLifeHops = 50;
+  NoiseEstimatorPeer noise_estimator_peer = NoiseEstimatorPeer(
+      kTestNumSamplesPerHop, /*num_hops_per_update=*/10, kTestNumFeatures,
+      std::pow(0.5f, 1.f / kMaxSmoothingHalflifeHops),
+      std::pow(0.5f, 1.f / kBoundHalfLifeHops), std::move(feature_extractor));
+  std::vector<float> periodic_signal_features(
+      kTestNumFeatures, LogMelSpectrogramExtractorImpl::GetSilenceValue());
+  //
+  for (int i = 0; i < kTestNumFeatures; i += 20) {
+    periodic_signal_features.at(i) = kMaxPower;
   }
+  const std::vector<float> base_noise = BaseNoise();
 
-  EXPECT_TRUE(
-      noise_estimator_->IsSimilarNoise(RandomNoise(kBaseNoise)).value());
-  EXPECT_FALSE(
-      noise_estimator_->IsSimilarNoise(RandomSignal(RandomNoise(kBaseNoise)))
-          .value());
-}
-
-TEST_F(NoiseEstimatorTest, BoundsDecay) {
-  const std::vector<float> kBaseNoise = BaseNoise();
-
-  // Run noise through estimator first.
-  for (int i = 1; i < kNumSeconds * kNumFramesPerSecond; ++i) {
-    const std::vector<float> noise = RandomNoise(kBaseNoise);
-    ASSERT_TRUE(noise_estimator_->Update(noise));
+  // Warm up on some noise.
+  for (int i = 0; i < kTestNumHops; ++i) {
+    noise_estimator_peer.UpdateNoiseEstimate(RandomNoise(base_noise));
   }
-
-  const float kOneHalfLifeFrames = kBoundHalfLifeSec / kNumSecondsPerFrame;
-  auto similar_noise = RandomNoise(kBaseNoise);
-  EXPECT_TRUE(noise_estimator_->IsSimilarNoise(similar_noise).value());
-
-  // Re-query for one half-life
-  for (int i = 0; i < kOneHalfLifeFrames; ++i) {
-    ASSERT_TRUE(noise_estimator_->IsSimilarNoise(similar_noise).has_value());
-  }
-
-  EXPECT_FALSE(noise_estimator_->IsSimilarNoise(similar_noise).value());
+  EXPECT_TRUE(noise_estimator_peer.ComputeIsNoise(base_noise));
+  EXPECT_FALSE(noise_estimator_peer.ComputeIsNoise(periodic_signal_features));
 }
 
 }  // namespace

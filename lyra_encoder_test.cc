@@ -14,23 +14,19 @@
 
 #include "lyra_encoder.h"
 
-#include <algorithm>
 #include <bitset>
 #include <climits>
-#include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 // Placeholder for get runfiles header.
-#include "absl/memory/memory.h"   // IWYU pragma: keep
-#include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"
-#include "denoiser_interface.h"
 #include "feature_extractor_interface.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,9 +34,7 @@
 #include "lyra_config.h"
 #include "noise_estimator_interface.h"
 #include "packet.h"
-#include "packet_interface.h"
 #include "resampler_interface.h"
-#include "testing/mock_denoiser.h"
 #include "testing/mock_feature_extractor.h"
 #include "testing/mock_noise_estimator.h"
 #include "testing/mock_resampler.h"
@@ -49,12 +43,6 @@
 
 namespace chromemedia {
 namespace codec {
-namespace {
-
-constexpr int kNumQuantizedBits = 120;
-constexpr int kNumHeaderBits = 0;
-
-}  // namespace
 
 // Use a test peer to access the private constructor of LyraEncoder in order
 // to inject mock dependencies.
@@ -65,24 +53,18 @@ class LyraEncoderPeer {
       std::unique_ptr<MockFeatureExtractor> mock_feature_extractor,
       std::unique_ptr<MockNoiseEstimator> mock_noise_estimator,
       std::unique_ptr<MockVectorQuantizer> mock_vector_quantizer,
-      std::unique_ptr<MockDenoiser> mock_denoiser, int sample_rate_hz,
-      int num_frames_per_packet, bool enable_dtx)
+      int sample_rate_hz, int num_quantized_bits, bool enable_dtx)
       : encoder_(std::move(mock_resampler), std::move(mock_feature_extractor),
                  std::move(mock_noise_estimator),
-                 std::move(mock_vector_quantizer), std::move(mock_denoiser),
-                 absl::make_unique<Packet<kNumQuantizedBits, kNumHeaderBits>>(),
-                 sample_rate_hz, kNumChannels, kBitrate, num_frames_per_packet,
-                 enable_dtx) {}
+                 std::move(mock_vector_quantizer), sample_rate_hz, kNumChannels,
+                 num_quantized_bits, enable_dtx) {}
 
-  absl::optional<std::vector<uint8_t>> Encode(
+  std::optional<std::vector<uint8_t>> Encode(
       const absl::Span<const int16_t> audio) {
-    return encoder_.EncodeInternal(audio, false);
+    return encoder_.Encode(audio);
   }
 
-  absl::optional<std::vector<uint8_t>> EncodeWithFiltering(
-      const absl::Span<const int16_t> audio) {
-    return encoder_.EncodeInternal(audio, true);
-  }
+  bool set_bitrate(int bitrate) { return encoder_.set_bitrate(bitrate); }
 
  private:
   LyraEncoder encoder_;
@@ -92,54 +74,40 @@ namespace {
 
 using testing::_;
 using testing::Combine;
-using testing::IsSupersetOf;
 using testing::Return;
-using testing::Values;
 using testing::ValuesIn;
 
 class LyraEncoderTest
     : public testing::TestWithParam<testing::tuple<int, int>> {
  protected:
   LyraEncoderTest()
-      : sample_rate_hz_(std::get<0>(GetParam())),
-        internal_sample_rate_hz_(GetInternalSampleRate(sample_rate_hz_)),
+      : external_sample_rate_hz_(std::get<0>(GetParam())),
+        num_quantized_bits_(std::get<1>(GetParam())),
         internal_num_samples_per_hop_(
-            GetNumSamplesPerHop(internal_sample_rate_hz_)),
-        num_frames_per_packet_(std::get<1>(GetParam())),
-        samples_(num_frames_per_packet_ * GetNumSamplesPerHop(sample_rate_hz_)),
+            GetNumSamplesPerHop(kInternalSampleRateHz)),
+        samples_(GetNumSamplesPerHop(external_sample_rate_hz_)),
         samples_span_(absl::MakeConstSpan(samples_)),
-        internal_samples_(num_frames_per_packet_ *
-                          internal_num_samples_per_hop_),
+        internal_samples_(internal_num_samples_per_hop_),
         internal_samples_span_(absl::MakeConstSpan(internal_samples_)),
-        mock_feature_extractor_(absl::make_unique<MockFeatureExtractor>()),
-        mock_noise_estimator_(absl::make_unique<MockNoiseEstimator>()),
-        mock_vector_quantizer_(absl::make_unique<MockVectorQuantizer>()),
-        mock_resampler_(absl::make_unique<MockResampler>()),
-        mock_denoiser_(absl::make_unique<MockDenoiser>()),
+        mock_feature_extractor_(std::make_unique<MockFeatureExtractor>()),
+        mock_noise_estimator_(std::make_unique<MockNoiseEstimator>()),
+        mock_vector_quantizer_(std::make_unique<MockVectorQuantizer>()),
+        mock_resampler_(std::make_unique<MockResampler>(
+            kInternalSampleRateHz, external_sample_rate_hz_)),
         mock_features_(kNumFeatures),
-        mock_concatenated_features_(num_frames_per_packet_ * kNumFeatures) {
+        mock_noise_features_(kNumMelBins),
+        mock_quantized_(num_quantized_bits_, '1') {
     // Populate the mock features, samples, and internal samples with
     // increasing values starting at 0.
-    std::iota(mock_features_.value().begin(), mock_features_.value().end(),
-              0.f);
+    std::iota(mock_features_.begin(), mock_features_.end(), 0.f);
+    std::iota(mock_noise_features_.begin(), mock_noise_features_.end(), 0.f);
     std::iota(samples_.begin(), samples_.end(), 0);
     std::iota(internal_samples_.begin(), internal_samples_.end(), 0);
-
-    // Mock concatenated features contains copies of mock features.
-    for (int i = 0; i < num_frames_per_packet_; ++i) {
-      std::copy(mock_features_.value().begin(), mock_features_.value().end(),
-                mock_concatenated_features_.begin() + i * kNumFeatures);
-    }
-
-    // Mock quantized contains all 1s at every bit position.
-    std::bitset<kNumQuantizedBits> mock_quantized_bits(0);
-    mock_quantized_bits.flip();
-    mock_quantized_ = mock_quantized_bits.to_string();
   }
 
   bool DoesPacketContainQuantized(const std::vector<uint8_t>& packet,
                                   const std::string& quantized_string) {
-    if (packet.size() < kPacketSize) {
+    if (packet.size() < GetPacketSize(num_quantized_bits_)) {
       return false;
     }
     std::string packet_data;
@@ -150,12 +118,12 @@ class LyraEncoderTest
     packet_data = packet_data.substr(kNumHeaderBits, packet_data.size());
     // Remove extra bits at the end of packet_data if the number of bits stored
     // in the packet is not evenly divisible by CHAR_BITS.
-    packet_data = packet_data.substr(0, kNumQuantizedBits);
+    packet_data = packet_data.substr(0, num_quantized_bits_);
     return packet_data == quantized_string;
   }
 
   void SetResamplerExpectation(int times_if_resampling) {
-    if (internal_sample_rate_hz_ == sample_rate_hz_) {
+    if (kInternalSampleRateHz == external_sample_rate_hz_) {
       EXPECT_CALL(*mock_resampler_, Resample(samples_span_)).Times(0);
     } else {
       EXPECT_CALL(*mock_resampler_, Resample(samples_span_))
@@ -164,10 +132,9 @@ class LyraEncoderTest
     }
   }
 
-  const int sample_rate_hz_;
-  const int internal_sample_rate_hz_;
+  const int external_sample_rate_hz_;
+  const int num_quantized_bits_;
   const int internal_num_samples_per_hop_;
-  const int num_frames_per_packet_;
   std::vector<int16_t> samples_;
   absl::Span<const int16_t> samples_span_;
   std::vector<int16_t> internal_samples_;
@@ -176,9 +143,8 @@ class LyraEncoderTest
   std::unique_ptr<MockNoiseEstimator> mock_noise_estimator_;
   std::unique_ptr<MockVectorQuantizer> mock_vector_quantizer_;
   std::unique_ptr<MockResampler> mock_resampler_;
-  std::unique_ptr<MockDenoiser> mock_denoiser_;
-  absl::optional<std::vector<float>> mock_features_;
-  std::vector<float> mock_concatenated_features_;
+  std::vector<float> mock_features_;
+  std::vector<float> mock_noise_features_;
   std::string mock_quantized_;
 };
 
@@ -192,302 +158,220 @@ TEST_P(LyraEncoderTest, InvalidSizedAudioFails) {
 
   SetResamplerExpectation(1);
   EXPECT_CALL(*mock_feature_extractor_, Extract(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_)).Times(0);
+  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_, _)).Times(0);
 
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_FALSE(encoded_or.has_value());
+  EXPECT_FALSE(encoded.has_value());
 }
 
 TEST_P(LyraEncoderTest, FeatureExtractionFails) {
   SetResamplerExpectation(1);
-  EXPECT_CALL(*mock_feature_extractor_, Extract(internal_samples_span_.subspan(
-                                            0, internal_num_samples_per_hop_)))
-      .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_)).Times(0);
+  EXPECT_CALL(*mock_feature_extractor_, Extract(internal_samples_span_))
+      .WillOnce(Return(std::nullopt));
+  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_, _)).Times(0);
 
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_FALSE(encoded_or.has_value());
+  EXPECT_FALSE(encoded.has_value());
 }
 
-TEST_P(LyraEncoderTest, SimilarNoiseEvaluationFails) {
+TEST_P(LyraEncoderTest, ReceiveSamplesFails) {
   SetResamplerExpectation(1);
-  EXPECT_CALL(*mock_feature_extractor_, Extract(internal_samples_span_.subspan(
-                                            0, internal_num_samples_per_hop_)))
-      .WillOnce(Return(mock_features_));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_))
-      .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_)).Times(0);
-
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/true);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
-
-  EXPECT_FALSE(encoded_or.has_value());
-}
-
-TEST_P(LyraEncoderTest, NoiseEstimationUpdateFails) {
-  SetResamplerExpectation(1);
-  EXPECT_CALL(*mock_feature_extractor_, Extract(internal_samples_span_.subspan(
-                                            0, internal_num_samples_per_hop_)))
-      .WillOnce(Return(mock_features_));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_))
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(internal_samples_span_))
+      .Times(1)
       .WillOnce(Return(false));
-  EXPECT_CALL(*mock_noise_estimator_, Update(mock_features_.value()))
-      .WillOnce(Return(false));
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_)).Times(0);
+  EXPECT_CALL(*mock_noise_estimator_, is_noise()).Times(0);
+  EXPECT_CALL(*mock_feature_extractor_, Extract(_)).Times(0);
+  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_, _)).Times(0);
 
   LyraEncoderPeer encoder_peer(
       std::move(mock_resampler_), std::move(mock_feature_extractor_),
       std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
+      external_sample_rate_hz_, num_quantized_bits_,
       /*enable_dtx=*/true);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_FALSE(encoded_or.has_value());
+  EXPECT_FALSE(encoded.has_value());
 }
 
-TEST_P(LyraEncoderTest, NoiseEstimationUpdateSucceeds) {
+TEST_P(LyraEncoderTest, ReceiveSamplesSucceeds) {
   SetResamplerExpectation(1);
-  for (int i = 0; i < num_frames_per_packet_; ++i) {
-    EXPECT_CALL(
-        *mock_feature_extractor_,
-        Extract(internal_samples_span_.subspan(
-            i * internal_num_samples_per_hop_, internal_num_samples_per_hop_)))
-        .WillOnce(Return(mock_features_));
-  }
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_))
-      .Times(num_frames_per_packet_)
+  EXPECT_CALL(*mock_feature_extractor_, Extract(internal_samples_span_))
+      .WillOnce(Return(mock_features_));
+  EXPECT_CALL(*mock_noise_estimator_, is_noise())
+      .Times(1)
       .WillRepeatedly(Return(false));
-  EXPECT_CALL(*mock_noise_estimator_, Update(_))
-      .Times(num_frames_per_packet_)
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(_))
+      .Times(1)
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_))
+  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_, _))
       .WillOnce(Return(mock_quantized_));
 
   LyraEncoderPeer encoder_peer(
       std::move(mock_resampler_), std::move(mock_feature_extractor_),
+
       std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
+      external_sample_rate_hz_, num_quantized_bits_,
       /*enable_dtx=*/true);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_TRUE(encoded_or.has_value());
+  EXPECT_TRUE(encoded.has_value());
 
-  Packet<0, 0> empty_packet;
-  const auto packed = empty_packet.PackQuantized(std::bitset<0>{}.to_string());
-  EXPECT_NE(packed, encoded_or.value());
+  auto empty_packet = Packet<0>::Create(0, 0);
+  const auto packed = empty_packet->PackQuantized(std::bitset<0>{}.to_string());
+  EXPECT_NE(packed, encoded.value());
 }
 
 TEST_P(LyraEncoderTest, NoiseDetectionReturnsEmptyPacket) {
   SetResamplerExpectation(1);
-  for (int i = 0; i < num_frames_per_packet_; ++i) {
-    EXPECT_CALL(
-        *mock_feature_extractor_,
-        Extract(internal_samples_span_.subspan(
-            i * internal_num_samples_per_hop_, internal_num_samples_per_hop_)))
-        .WillOnce(Return(mock_features_));
-  }
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_))
-      .Times(num_frames_per_packet_)
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_)).Times(0);
+  EXPECT_CALL(*mock_noise_estimator_, is_noise())
+      .Times(1)
+      .WillOnce(Return(true));
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(_))
+      .Times(1)
+      .WillOnce(Return(true));
+  EXPECT_CALL(*mock_feature_extractor_, Extract(_)).Times(0);
+  EXPECT_CALL(*mock_vector_quantizer_, Quantize(_, _)).Times(0);
 
   LyraEncoderPeer encoder_peer(
       std::move(mock_resampler_), std::move(mock_feature_extractor_),
       std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
+      external_sample_rate_hz_, num_quantized_bits_,
       /*enable_dtx=*/true);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_TRUE(encoded_or.has_value());
+  EXPECT_TRUE(encoded.has_value());
 
-  Packet<0, 0> empty_packet;
-  const auto packed = empty_packet.PackQuantized(std::bitset<0>{}.to_string());
-  EXPECT_EQ(packed, encoded_or.value());
+  auto empty_packet = Packet<0>::Create(0, 0);
+  const auto packed = empty_packet->PackQuantized(std::bitset<0>{}.to_string());
+  EXPECT_EQ(packed, encoded.value());
 }
 
 TEST_P(LyraEncoderTest, QuantizationFails) {
   SetResamplerExpectation(1);
   EXPECT_CALL(*mock_feature_extractor_, Extract(_))
-      .Times(num_frames_per_packet_)
+      .Times(1)
       .WillRepeatedly(Return(mock_features_));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(mock_concatenated_features_))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*mock_vector_quantizer_,
+              Quantize(mock_features_, num_quantized_bits_))
+      .WillOnce(Return(std::nullopt));
 
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
-  auto encoded_or = encoder_peer.Encode(samples_span_);
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
+  auto encoded = encoder_peer.Encode(samples_span_);
 
-  EXPECT_FALSE(encoded_or.has_value());
-}
-
-TEST_P(LyraEncoderTest, EncodeWithFilteringModifiesSignal) {
-  // Before filtering, the signal contains only a DC of 5.
-  std::fill(samples_.begin(), samples_.end(), 5);
-  std::fill(internal_samples_.begin(), internal_samples_.end(), 5);
-  SetResamplerExpectation(1);
-
-  // After filtering, the extractor gets an input that is filtered, which is
-  // supposed to have the DC component removed. We test that at least 80% of
-  // the samples_ are turned into zero.
-  std::vector<int16_t> zeros_subset(
-      static_cast<size_t>(internal_num_samples_per_hop_ * 0.8), 0);
-  EXPECT_CALL(*mock_feature_extractor_, Extract(IsSupersetOf(zeros_subset)))
-      .Times(num_frames_per_packet_)
-      .WillRepeatedly(Return(mock_features_));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(mock_concatenated_features_))
-      .WillOnce(Return(mock_quantized_));
-
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
-  auto encoded_or = encoder_peer.EncodeWithFiltering(samples_span_);
-
-  EXPECT_TRUE(encoded_or.has_value());
-  EXPECT_EQ(encoded_or.value().size(), kPacketSize);
-  EXPECT_TRUE(DoesPacketContainQuantized(encoded_or.value(), mock_quantized_));
-}
-
-TEST_P(LyraEncoderTest, EncodeWithDenoiser) {
-  std::fill(samples_.begin(), samples_.end(), 5);
-  std::fill(internal_samples_.begin(), internal_samples_.end(), 5);
-  SetResamplerExpectation(1);
-  std::vector<int16_t> zeros_subset(
-      static_cast<size_t>(internal_num_samples_per_hop_ * 0.8), 0);
-  EXPECT_CALL(*mock_feature_extractor_, Extract(IsSupersetOf(zeros_subset)))
-      .Times(num_frames_per_packet_)
-      .WillRepeatedly(Return(mock_features_));
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(mock_concatenated_features_))
-      .WillOnce(Return(mock_quantized_));
-
-  const int denoiser_num_samples_per_hop = internal_num_samples_per_hop_ / 4;
-  std::vector<int16_t> denoised_frame(denoiser_num_samples_per_hop, 5);
-
-  EXPECT_CALL(*mock_denoiser_, SamplesPerHop())
-      .WillRepeatedly(Return(denoiser_num_samples_per_hop));
-  EXPECT_CALL(*mock_denoiser_, Denoise(_))
-      .Times(4 * num_frames_per_packet_)
-      .WillRepeatedly(Return(denoised_frame));
-
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      std::move(mock_denoiser_), sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
-  auto encoded_or = encoder_peer.EncodeWithFiltering(samples_span_);
-
-  EXPECT_TRUE(encoded_or.has_value());
-  EXPECT_EQ(encoded_or.value().size(), kPacketSize);
-  EXPECT_TRUE(DoesPacketContainQuantized(encoded_or.value(), mock_quantized_));
+  EXPECT_FALSE(encoded.has_value());
 }
 
 TEST_P(LyraEncoderTest, MultipleEncodeCalls) {
   const int kNumEncodeCalls = 5;
   SetResamplerExpectation(kNumEncodeCalls);
-  for (int i = 0; i < num_frames_per_packet_; ++i) {
-    EXPECT_CALL(
-        *mock_feature_extractor_,
-        Extract(internal_samples_span_.subspan(
-            i * internal_num_samples_per_hop_, internal_num_samples_per_hop_)))
-        .Times(kNumEncodeCalls)
-        .WillRepeatedly(Return(mock_features_));
-  }
-  EXPECT_CALL(*mock_noise_estimator_, IsSimilarNoise(_)).Times(0);
-  EXPECT_CALL(*mock_noise_estimator_, Update(_)).Times(0);
-  EXPECT_CALL(*mock_vector_quantizer_, Quantize(mock_concatenated_features_))
+  EXPECT_CALL(*mock_feature_extractor_, Extract(_))
+      .Times(kNumEncodeCalls)
+      .WillRepeatedly(Return(mock_features_));
+  EXPECT_CALL(*mock_vector_quantizer_,
+              Quantize(mock_features_, num_quantized_bits_))
       .Times(kNumEncodeCalls)
       .WillRepeatedly(Return(mock_quantized_));
 
-  LyraEncoderPeer encoder_peer(
-      std::move(mock_resampler_), std::move(mock_feature_extractor_),
-      std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
-      nullptr, sample_rate_hz_, num_frames_per_packet_,
-      /*enable_dtx=*/false);
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
   for (int i = 0; i < kNumEncodeCalls; ++i) {
-    auto encoded_or = encoder_peer.Encode(samples_span_);
+    auto encoded = encoder_peer.Encode(samples_span_);
 
-    EXPECT_TRUE(encoded_or.has_value());
-    EXPECT_EQ(encoded_or.value().size(), kPacketSize);
-    EXPECT_TRUE(
-        DoesPacketContainQuantized(encoded_or.value(), mock_quantized_));
+    EXPECT_TRUE(encoded.has_value());
+    EXPECT_EQ(encoded.value().size(), GetPacketSize(num_quantized_bits_));
+    EXPECT_TRUE(DoesPacketContainQuantized(encoded.value(), mock_quantized_));
   }
 }
 
 TEST_P(LyraEncoderTest, GoodCreationParametersReturnNotNullptr) {
-  const auto valid_model_path = ghc::filesystem::current_path() / "wavegru";
+  const auto valid_model_path =
+      ghc::filesystem::current_path() / "model_coeffs";
 
   EXPECT_NE(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/false, valid_model_path));
   EXPECT_NE(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/true, valid_model_path));
 }
 
 TEST_P(LyraEncoderTest, BadCreationParametersReturnNullptr) {
-  const auto valid_model_path = ghc::filesystem::current_path() / "wavegru";
+  const auto valid_model_path =
+      ghc::filesystem::current_path() / "model_coeffs";
 
+  EXPECT_EQ(nullptr, LyraEncoder::Create(
+                         0, kNumChannels, GetBitrate(num_quantized_bits_),
+                         /*enable_dtx=*/false, valid_model_path));
+  EXPECT_EQ(nullptr, LyraEncoder::Create(
+                         0, kNumChannels, GetBitrate(num_quantized_bits_),
+                         /*enable_dtx=*/true, valid_model_path));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(0, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, -3,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/false, valid_model_path));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(0, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, -3,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/true, valid_model_path));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, -3, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels, -2,
                                 /*enable_dtx=*/false, valid_model_path));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, -3, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels, -2,
                                 /*enable_dtx=*/true, valid_model_path));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, -2,
-                                /*enable_dtx=*/false, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, -2,
-                                /*enable_dtx=*/true, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/false, "bad_model_path"));
   EXPECT_EQ(nullptr,
-            LyraEncoder::Create(sample_rate_hz_, kNumChannels, kBitrate,
+            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
+                                GetBitrate(num_quantized_bits_),
                                 /*enable_dtx=*/true, "bad_model_path"));
 }
 
-INSTANTIATE_TEST_SUITE_P(SampleRates, LyraEncoderTest,
+TEST_P(LyraEncoderTest, SetBitrateSucceeds) {
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
+  EXPECT_TRUE(encoder_peer.set_bitrate(GetBitrate(num_quantized_bits_)));
+}
+
+TEST_P(LyraEncoderTest, SetBitrateFails) {
+  LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
+                               std::move(mock_feature_extractor_), nullptr,
+                               std::move(mock_vector_quantizer_),
+                               external_sample_rate_hz_, num_quantized_bits_,
+                               /*enable_dtx=*/false);
+  EXPECT_FALSE(encoder_peer.set_bitrate(0));
+}
+
+INSTANTIATE_TEST_SUITE_P(SampleRatesQuantizedBitsAndHopsPerPacket,
+                         LyraEncoderTest,
                          Combine(ValuesIn(kSupportedSampleRates),
-                                 Values(1, 2, 3)));
+                                 ValuesIn(GetSupportedQuantizedBits())));
 
 }  // namespace
 }  // namespace codec

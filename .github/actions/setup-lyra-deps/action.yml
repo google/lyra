@@ -1,0 +1,12 @@
+name: setup-lyra-deps
+
+description: Setup NDK and python for lyra build
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;21.4.7075529"
+        python -m pip install --upgrade pip
+        pip install numpy

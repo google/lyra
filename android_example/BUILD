@@ -1,5 +1,4 @@
 load("@rules_android//android:rules.bzl", "android_binary", "android_library")
-load("@gmaven_rules//:defs.bzl", "gmaven_artifact")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,28 +6,39 @@ licenses(["notice"])
 
 # Android App rules
 cc_library(
-    name = "jni_benchmark_decode_lib",
-    srcs = ["jni_benchmark_decode_lib.cc"],
+    name = "jni_lyra_benchmark_lib",
+    srcs = [
+        "jni_lyra_benchmark_lib.cc",
+        "@org_tensorflow//tensorflow/lite:libtensorflowlite.so",
+    ],
+    linkopts = [
+        "-landroid",
+        "-ldl",
+        "-llog",
+    ],
     deps = [
-        "//:benchmark_decode_lib",
         "//:decoder_main_lib",
         "//:encoder_main_lib",
+        "//:lyra_benchmark_lib",
         "//:lyra_config",
+        "@com_google_absl//absl/random",
     ],
     alwayslink = True,
 )
 
 android_library(
     name = "lyra_android_lib",
-    srcs = ["java/com/example/android/lyra/MainActivity.java"],
+    srcs = ["//android_example/java/com/example/android/lyra:MainActivity.java"],
     custom_package = "com.example.android.lyra",
     manifest = "LibraryManifest.xml",
     resource_files = glob(["res/**/*"]),
     deps = [
-        ":jni_benchmark_decode_lib",
-        gmaven_artifact("com.android.support.constraint:constraint-layout:aar:1.1.2"),
-        gmaven_artifact("com.android.support:appcompat-v7:aar:26.1.0"),
-        "@com_android_support_support_annotations_26_1_0",
+        ":jni_lyra_benchmark_lib",
+        "@maven//:androidx_annotation_annotation",
+        "@maven//:androidx_appcompat_appcompat",
+        "@maven//:androidx_constraintlayout_constraintlayout",
+        "@maven//:androidx_core_core",
+        "@org_tensorflow//tensorflow/lite:libtensorflowlite.so",
     ],
 )
 
@@ -42,8 +52,9 @@ android_binary(
     assets = [
         ":assets",
     ],
-    assets_dir = "wavegru",
+    assets_dir = "model_coeffs",
     custom_package = "com.example.android.lyra",
     manifest = "AndroidManifest.xml",
+    multidex = "native",
     deps = [":lyra_android_lib"],
 )

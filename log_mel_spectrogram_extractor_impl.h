@@ -19,9 +19,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "audio/dsp/mfcc/mel_filterbank.h"
 #include "audio/dsp/spectrogram/spectrogram.h"
@@ -30,20 +30,20 @@
 namespace chromemedia {
 namespace codec {
 
-// This class extracts mel spectrogram features from a frame of audio.
+// This class extracts mel spectrogram features from audio samples.
 class LogMelSpectrogramExtractorImpl : public FeatureExtractorInterface {
  public:
   // Returns a nullptr if creation fails.
   static std::unique_ptr<LogMelSpectrogramExtractorImpl> Create(
-      int sample_rate_hz, int num_mel_bins, int hop_length_samples,
-      int window_length_samples);
+      int sample_rate_hz, int hop_length_samples, int window_length_samples,
+      int num_mel_bins);
 
   ~LogMelSpectrogramExtractorImpl() override {}
 
   // Extracts the mel features from the audio. On failure returns a nullopt.
-  // The size of audio must match the value of hop_length_samples_.
-  // This assumes that audio frames are passed in order.
-  absl::optional<std::vector<float>> Extract(
+  // The size of |audio| must match the value of |hop_length_samples_|.
+  // This assumes that audio samples are passed in order.
+  std::optional<std::vector<float>> Extract(
       const absl::Span<const int16_t> audio) override;
 
   // Returns the lower frequency limit used to initialize the MelFilterbank

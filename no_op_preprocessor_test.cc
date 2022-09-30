@@ -14,8 +14,11 @@
 
 #include "no_op_preprocessor.h"
 
+#include <cstdint>
 #include <numeric>
+#include <vector>
 
+#include "absl/types/span.h"
 #include "gtest/gtest.h"
 
 namespace chromemedia {

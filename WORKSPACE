@@ -36,7 +36,7 @@ protobuf_deps()
 git_repository(
     name = "com_google_absl",
     remote = "https://github.com/abseil/abseil-cpp.git",
-    branch = "lts_2020_09_23",
+    tag = "20211102.0",
 )
 
 # Filesystem
@@ -60,25 +60,18 @@ new_git_repository(
 # Audio DSP
 git_repository(
     name = "com_google_audio_dsp",
-    remote = "https://github.com/google/multichannel-audio-tools.git",
+    # TODO(b/231448719) use main google repo after merging PR for TF eigen compatibility.
+    remote = "https://github.com/mchinen/multichannel-audio-tools.git",
     # There are no tags for this repo, we are synced to bleeding edge.
-    branch = "master",
+    commit = "14a45c5a7c965e5ef01fe537bd816ce10a247813",
     repo_mapping = {
-        "@com_github_glog_glog" : "@com_google_glog"
+        "@com_github_glog_glog" : "@com_google_glog",
+        "@eigen3": "@eigen_archive"
     }
 )
 
 # Transitive dependencies of Audio DSP.
-http_archive(
-    name = "eigen_archive",
-    build_file = "eigen.BUILD",
-    sha256 = "f3d69ac773ecaf3602cb940040390d4e71a501bb145ca9e01ce5464cf6d4eb68",
-    strip_prefix = "eigen-eigen-049af2f56331",
-    urls = [
-        "http://mirror.tensorflow.org/bitbucket.org/eigen/eigen/get/049af2f56331.tar.gz",
-        "https://bitbucket.org/eigen/eigen/get/049af2f56331.tar.gz",
-    ],
-)
+# Note: eigen is used by Audio DSP, but provided through tensorflow workspace functions.
 
 http_archive(
     name = "fft2d",
@@ -115,16 +108,11 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
-android_sdk_repository(
-    name = "androidsdk",
-    api_level = 30,
-    build_tools_version = "30.0.3"
-)
+load("//:android_configure.bzl", "android_configure")
+android_configure(name = "local_config_android")
 
-android_ndk_repository(
-    name = "androidndk",
-    api_level = 30
-)
+load("@local_config_android//:android_configure.bzl", "android_workspace")
+android_workspace()
 
 http_archive(
     name = "rules_android",
@@ -134,14 +122,68 @@ http_archive(
 )
 
 # Google Maven Repository
-GMAVEN_TAG = "20180625-1"
+# See https://github.com/android/android-test/blob/master/WORKSPACE for examples
+# of importing android deps.
+# The specific versions can be found in:
+# https://github.com/android/android-test/blob/master/build_extensions/axt_versions.bzl
+# and
+# https://developer.android.com/jetpack/androidx/releases/
+# This allows us to use "@maven//some_android_package" deps for imports.
+
+RULES_JVM_EXTERNAL_TAG = "4.0"
+RULES_JVM_EXTERNAL_SHA = "31701ad93dbfe544d597dbe62c9a1fdd76d81d8a9150c2bf1ecf928ecdf97169"
 
 http_archive(
-    name = "gmaven_rules",
-    strip_prefix = "gmaven_rules-%s" % GMAVEN_TAG,
-    url = "https://github.com/bazelbuild/gmaven_rules/archive/%s.tar.gz" % GMAVEN_TAG,
+    name = "rules_jvm_external",
+    strip_prefix = "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
+    sha256 = RULES_JVM_EXTERNAL_SHA,
+    url = "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
 )
 
-load("@gmaven_rules//:gmaven.bzl", "gmaven_rules")
+load("@rules_jvm_external//:defs.bzl", "maven_install")
 
-gmaven_rules()
+maven_install(
+    artifacts = [
+        "androidx.annotation:annotation:1.2.0",
+        "androidx.appcompat:appcompat:1.3.1",
+        "androidx.core:core:1.6.0",
+        "androidx.constraintlayout:constraintlayout:2.1.1"
+    ],
+    repositories = [
+        "https://maven.google.com",
+        "https://repo1.maven.org/maven2",
+    ],
+)
+
+
+# Begin Tensorflow WORKSPACE subset required for TFLite
+
+git_repository(
+    name = "org_tensorflow",
+    remote = "https://github.com/tensorflow/tensorflow.git",
+    # Below is reproducible and equivalent to `tag = "v2.9.0"`
+    commit = "8a20d54a3c1bfa38c03ea99a2ad3c1b0a45dfa95",
+    shallow_since = "1652465115 -0700"
+)
+
+# Check bazel version requirement, which is stricter than TensorFlow's.
+load(
+    "@org_tensorflow//tensorflow:version_check.bzl",
+    "check_bazel_version_at_least",
+)
+
+check_bazel_version_at_least("3.7.2")
+
+# TF WORKSPACE Loading functions
+# This section uses a subset of the tensorflow WORKSPACE loading by reusing its contents.
+# There are four workspace() functions create repos for the dependencies.
+# TF's loading is very complicated, and we only need a subset for TFLite.
+# If we use the full TF loading sequence, we also run into conflicts and errors on some platforms.
+
+load("@org_tensorflow//tensorflow:workspace3.bzl", "workspace")
+workspace()
+
+load("@org_tensorflow//tensorflow:workspace2.bzl", workspace2 = "workspace")
+workspace2()
+
+# End Tensorflow WORKSPACE subset required for TFLite
