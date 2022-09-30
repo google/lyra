@@ -34,19 +34,12 @@ class MockLyraDecoder : public LyraDecoderInterface {
 
   MOCK_METHOD(bool, SetEncodedPacket, (absl::Span<const uint8_t>), (override));
 
-  MOCK_METHOD(absl::optional<std::vector<int16_t>>, DecodeSamples, (int),
-              (override));
-
-  MOCK_METHOD(absl::optional<std::vector<int16_t>>, DecodePacketLoss, ());
-
-  MOCK_METHOD(absl::optional<std::vector<int16_t>>, DecodePacketLoss, (int),
+  MOCK_METHOD(std::optional<std::vector<int16_t>>, DecodeSamples, (int),
               (override));
 
   MOCK_METHOD(int, sample_rate_hz, (), (const, override));
 
   MOCK_METHOD(int, num_channels, (), (const, override));
-
-  MOCK_METHOD(int, bitrate, (), (const, override));
 
   MOCK_METHOD(int, frame_rate, (), (const, override));
 

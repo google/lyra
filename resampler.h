@@ -32,16 +32,27 @@ namespace codec {
 class Resampler : public ResamplerInterface {
  public:
   ~Resampler() override;
-  static std::unique_ptr<Resampler> Create(double input_sample_rate_hz,
-                                           double target_sample_rate_hz);
 
-  // Resamples audio at input_sample_rate_hz to target_sample_rate_hz.
+  static std::unique_ptr<Resampler> Create(int input_sample_rate_hz,
+                                           int target_sample_rate_hz);
+
+  // Resamples audio at |input_sample_rate_hz| to |target_sample_rate_hz|.
   std::vector<int16_t> Resample(absl::Span<const int16_t> audio) override;
 
   void Reset() override;
 
+  int input_sample_rate_hz() const override;
+
+  int target_sample_rate_hz() const override;
+
+  int samples_until_steady_state() const override;
+
  private:
-  explicit Resampler(audio_dsp::QResampler<float> dsp_resampler);
+  const int input_sample_rate_hz_;
+  const int target_sample_rate_hz_;
+
+  explicit Resampler(audio_dsp::QResampler<float> dsp_resampler,
+                     int input_sample_rate_hz, int target_sample_rate_hz);
   audio_dsp::QResampler<float> resampler_;
 };
 

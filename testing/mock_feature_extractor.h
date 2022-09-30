@@ -32,7 +32,7 @@ class MockFeatureExtractor : public FeatureExtractorInterface {
  public:
   ~MockFeatureExtractor() override {}
 
-  MOCK_METHOD(absl::optional<std::vector<float>>, Extract,
+  MOCK_METHOD(std::optional<std::vector<float>>, Extract,
               (const absl::Span<const int16_t> audio), (override));
 };
 

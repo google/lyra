@@ -18,9 +18,9 @@
 #define LYRA_CODEC_FEATURE_EXTRACTOR_INTERFACE_H_
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace chromemedia {
@@ -34,7 +34,7 @@ class FeatureExtractorInterface {
   virtual ~FeatureExtractorInterface() {}
 
   // Extracts features from the audio. On failure returns a nullopt.
-  virtual absl::optional<std::vector<float>> Extract(
+  virtual std::optional<std::vector<float>> Extract(
       const absl::Span<const int16_t> audio) = 0;
 };
 

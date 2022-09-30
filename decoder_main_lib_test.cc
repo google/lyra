@@ -14,15 +14,11 @@
 
 #include "decoder_main_lib.h"
 
-#include <cstdio>
-#include <memory>
 #include <string>
 #include <system_error>  // NOLINT(build/c++11)
-#include <tuple>
+#include <vector>
 
 // Placeholder for get runfiles header.
-#include "gmock/gmock.h"
-// Placeholder for testing header.
 #include "absl/flags/flag.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -30,14 +26,14 @@
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 #include "lyra_config.h"
-#include "wav_util.h"
+#include "wav_utils.h"
 
 namespace chromemedia {
 namespace codec {
 namespace {
 
 static constexpr absl::string_view kTestdataDir = "testdata";
-static constexpr absl::string_view kExportedModelPath = "wavegru";
+static constexpr absl::string_view kExportedModelPath = "model_coeffs";
 
 class DecoderMainLibTest : public testing::TestWithParam<int> {
  protected:
@@ -46,8 +42,7 @@ class DecoderMainLibTest : public testing::TestWithParam<int> {
         testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
         model_path_(ghc::filesystem::current_path() / kExportedModelPath),
         sample_rate_hz_(GetParam()),
-        num_samples_in_packet_(kNumFramesPerPacket *
-                               GetNumSamplesPerHop(sample_rate_hz_)) {}
+        num_samples_in_packet_(GetNumSamplesPerHop(sample_rate_hz_)) {}
 
   void SetUp() override {
     std::error_code error_code;
@@ -64,75 +59,109 @@ class DecoderMainLibTest : public testing::TestWithParam<int> {
     return 0;
   }
 
+  void SetInputOutputPath(const absl::string_view input_base_name) {
+    input_path_ = testdata_dir_ / absl::StrCat(input_base_name, ".lyra");
+    output_path_ =
+        output_dir_ / absl::StrCat(input_base_name, "_", GetParam(), ".wav");
+  }
+
   const ghc::filesystem::path output_dir_;
   const ghc::filesystem::path testdata_dir_;
   const ghc::filesystem::path model_path_;
+  ghc::filesystem::path input_path_;
+  ghc::filesystem::path output_path_;
   const int sample_rate_hz_;
   const int num_samples_in_packet_;
 };
 
 TEST_P(DecoderMainLibTest, NoEncodedPacket) {
-  const std::string kInputBaseName = "no_encoded_frames";
-  const auto input_filepath = testdata_dir_ / kInputBaseName;
-  const auto output_filepath =
-      output_dir_ / absl::StrCat(kInputBaseName, "_", GetParam(), ".wav");
-
-  EXPECT_FALSE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
-                          /*packet_loss_rate=*/0.f,
-                          /*average_burst_length=*/1.f, model_path_));
+  SetInputOutputPath("no_encoded_packet");
+  EXPECT_FALSE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/3200, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.f,
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
 }
 
 TEST_P(DecoderMainLibTest, OneEncodedPacket) {
-  const std::string kInputBaseName = "one_encoded_frame_16khz";
-  const auto input_filepath = testdata_dir_ / kInputBaseName;
-  const auto output_filepath =
-      output_dir_ / absl::StrCat(kInputBaseName, "_", GetParam(), ".wav");
-  EXPECT_TRUE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
-                         /*packet_loss_rate=*/0.f,
-                         /*average_burst_length=*/1.f, model_path_));
+  SetInputOutputPath("one_encoded_packet_16khz");
+  EXPECT_TRUE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.f,
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
 
-  EXPECT_EQ(NumSamplesInWavFile(output_filepath), num_samples_in_packet_);
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), num_samples_in_packet_);
+}
+
+TEST_P(DecoderMainLibTest, RandomizeSampleRequests) {
+  SetInputOutputPath("one_encoded_packet_16khz");
+  EXPECT_TRUE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/true,
+      /*packet_loss_rate=*/0.f,
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), num_samples_in_packet_);
 }
 
 TEST_P(DecoderMainLibTest, FileDoesNotExist) {
-  const std::string kInputBaseName = "non_existent";
-  const auto input_filepath = testdata_dir_ / kInputBaseName;
-  const auto output_filepath =
-      output_dir_ / absl::StrCat(kInputBaseName, "_", GetParam(), ".wav");
-
-  EXPECT_FALSE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
-                          /*packet_loss_rate=*/0.f,
-                          /*average_burst_length=*/1.f, model_path_));
+  SetInputOutputPath("non_existent");
+  EXPECT_FALSE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.f,
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
 }
 
-// Tests an encoded features file with less than 1 frame's worth of data.
-TEST_P(DecoderMainLibTest, IncompleteEncodedFrame) {
-  const std::string kInputBaseName = "incomplete_encoded_frame";
-  const auto input_filepath = testdata_dir_ / kInputBaseName;
-  const auto output_filepath =
-      output_dir_ / absl::StrCat(kInputBaseName, "_", GetParam(), ".wav");
+// Tests an encoded features file with less than 1 packet's worth of data.
+TEST_P(DecoderMainLibTest, IncompleteEncodedPacket) {
+  SetInputOutputPath("incomplete_encoded_packet");
 
-  EXPECT_FALSE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
-                          /*packet_loss_rate=*/0.f,
-                          /*average_burst_length=*/1.f, model_path_));
+  EXPECT_FALSE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.f,
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
 }
 
-TEST_P(DecoderMainLibTest, TwoEncodedFramesWithPacketLoss) {
-  const std::string kInputBaseName = "two_encoded_frames_16khz";
-  const auto input_filepath = testdata_dir_ / (kInputBaseName + ".lyra");
-  const auto output_filepath =
-      output_dir_ / absl::StrCat(kInputBaseName, "_", GetParam(), ".wav");
+TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithPacketLoss) {
+  SetInputOutputPath("two_encoded_packets_16khz");
   const int expected_num_samples = 2 * num_samples_in_packet_;
 
-  EXPECT_TRUE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
-                         /*packet_loss_rate=*/0.5f,
-                         /*average_burst_length=*/2.f, model_path_));
-  EXPECT_EQ(NumSamplesInWavFile(output_filepath), expected_num_samples);
+  EXPECT_TRUE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.5f,
+      /*average_burst_length=*/2.f, PacketLossPattern({}, {}), model_path_));
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 
-  EXPECT_TRUE(DecodeFile(input_filepath, output_filepath, sample_rate_hz_,
+  EXPECT_TRUE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.9f,
+      /*average_burst_length=*/10.f, PacketLossPattern({}, {}), model_path_));
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
+}
+
+TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithFixedPacketLoss) {
+  SetInputOutputPath("two_encoded_packets_16khz");
+  const int expected_num_samples = 2 * num_samples_in_packet_;
+
+  EXPECT_TRUE(DecodeFile(
+      input_path_, output_path_, sample_rate_hz_,
+      /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
+      /*packet_loss_rate=*/0.9f,
+      /*average_burst_length=*/10.f, PacketLossPattern({1}, {0}), model_path_));
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
+
+  EXPECT_TRUE(DecodeFile(input_path_, output_path_, sample_rate_hz_,
+                         /*bitrate=*/6000,
+                         /*randomize_num_samples_requested=*/false,
                          /*packet_loss_rate=*/0.9f,
-                         /*average_burst_length=*/10.f, model_path_));
-  EXPECT_EQ(NumSamplesInWavFile(output_filepath), expected_num_samples);
+                         /*average_burst_length=*/10.f,
+                         PacketLossPattern({0}, {100}), model_path_));
+  EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 }
 
 INSTANTIATE_TEST_SUITE_P(SampleRates, DecoderMainLibTest,

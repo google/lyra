@@ -18,11 +18,8 @@
 #include <system_error>  // NOLINT(build/c++11)
 
 // Placeholder for get runfiles header.
-#include "gmock/gmock.h"
 // Placeholder for testing header.
 #include "absl/flags/flag.h"
-#include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
@@ -32,8 +29,7 @@ namespace codec {
 namespace {
 
 static constexpr absl::string_view kWavFiles[] = {
-    "48khz_sample_000003", "32khz_sample_000002", "16khz_sample_000001",
-    "8khz_sample_000000"};
+    "sample1_8kHz", "sample1_16kHz", "sample1_32kHz", "sample1_48kHz"};
 
 static constexpr absl::string_view kTestdataDir = "testdata";
 
@@ -42,7 +38,7 @@ class EncoderMainLibTest : public testing::Test {
   EncoderMainLibTest()
       : output_dir_(ghc::filesystem::path(testing::TempDir()) / "output"),
         testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
-        model_path_(ghc::filesystem::current_path() / "wavegru") {}
+        model_path_(ghc::filesystem::current_path() / "model_coeffs") {}
 
   void SetUp() override {
     std::error_code error_code;
@@ -65,7 +61,7 @@ TEST_F(EncoderMainLibTest, WavFileNotFound) {
   const ghc::filesystem::path kNonExistentWav("should/not/exist.wav");
   const ghc::filesystem::path kOutputEncoded(output_dir_ / "exists.lyra");
 
-  EXPECT_FALSE(EncodeFile(kNonExistentWav, kOutputEncoded,
+  EXPECT_FALSE(EncodeFile(kNonExistentWav, kOutputEncoded, /*bitrate=*/3200,
                           /*enable_preprocessing=*/false,
                           /*enable_dtx=*/false, model_path_));
 
@@ -77,7 +73,7 @@ TEST_F(EncoderMainLibTest, EncodeSingleWavFiles) {
   for (const auto wav_file : kWavFiles) {
     const auto kInputWavepath = (testdata_dir_ / wav_file).concat(".wav");
     const auto kOutputEncoded = (output_dir_ / wav_file).concat(".lyra");
-    EXPECT_TRUE(EncodeFile(kInputWavepath, kOutputEncoded,
+    EXPECT_TRUE(EncodeFile(kInputWavepath, kOutputEncoded, /*bitrate=*/3200,
                            /*enable_preprocessing=*/false,
                            /*enable_dtx=*/false, model_path_));
   }

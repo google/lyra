@@ -23,18 +23,24 @@ import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.media.MediaRecorder;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
-import android.support.v4.app.ActivityCompat;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * The main activity for the Lyra android example.
+ * It features benchmarking to logcat and coding lyra from the mic.
+ */
 public class MainActivity extends AppCompatActivity {
   private static final String TAG = "MainActivity";
 
@@ -44,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
 
   private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
   private static final int SAMPLE_RATE = 16000;
-  private static final int PLAYBACK_SKIP_SAMPLES = 4000;
   private static final String[] permissions = {Manifest.permission.RECORD_AUDIO};
 
   private boolean hasStartedDecode = false;
@@ -78,6 +83,14 @@ public class MainActivity extends AppCompatActivity {
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
+
+    // Populate the bits per second dropdown widget.
+    Spinner spinner = (Spinner) findViewById(R.id.bps_spinner);
+    Integer[] bpsArray = new Integer[]{3200, 6000, 9200};
+    ArrayAdapter<Integer> adapter =
+        new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, bpsArray);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spinner.setAdapter(adapter);
 
     // The weights are stored inside of the APK as assets for this demo, but
     // the Lyra library requires them to live in files.
@@ -117,16 +130,18 @@ public class MainActivity extends AppCompatActivity {
         TAG, "Finished recording from microphone.  Recorded " + micDataShortsWritten + " samples.");
   }
 
-  private synchronized void encodeAndDecodeMicDataToSpeaker() {
+  private synchronized void encodeAndDecodeMicDataToSpeaker(int bitrate) {
     // There must be at least enough data recorded to output something useful.
-    if (micDataShortsWritten < PLAYBACK_SKIP_SAMPLES) {
+    if (micDataShortsWritten == 0) {
       return;
     }
     // Whatever micData holds, encode and decode with Lyra.
-    short[] decodedAudio = encodeAndDecodeSamples(micData, micDataShortsWritten, weightsDirectory);
+    short[] decodedAudio = encodeAndDecodeSamples(micData, micDataShortsWritten, bitrate,
+        weightsDirectory);
 
     if (decodedAudio == null) {
       Log.e(TAG, "Failed to encode and decode microphone data.");
+      return;
     }
 
     // Create a new AudioTrack in static mode so we can write once and
@@ -149,10 +164,10 @@ public class MainActivity extends AppCompatActivity {
     int shortsWritten =
         player.write(
             decodedAudio,
-            PLAYBACK_SKIP_SAMPLES,
-            decodedAudio.length - PLAYBACK_SKIP_SAMPLES,
+            0,
+            decodedAudio.length,
             AudioTrack.WRITE_BLOCKING);
-    Log.e(
+    Log.i(
         TAG,
         "Wrote "
             + shortsWritten
@@ -168,6 +183,33 @@ public class MainActivity extends AppCompatActivity {
     // Notify we stopped recording.
     Button button = (Button) findViewById(R.id.button_record);
     button.post(() -> button.setText("Record from microphone"));
+    Button decodeButton = (Button) findViewById(R.id.button_decode);
+    decodeButton.setEnabled(true);
+  }
+
+  /** Called when user taps the 'Encode/Decode To Speaker' button. */
+  public void onDecodeButtonClicked(View view) {
+    Log.i(TAG, "Starting decoding.");
+
+    Button decodeButton = (Button) view;
+    decodeButton.setEnabled(false);
+    Button recordButton = (Button) findViewById(R.id.button_record);
+    recordButton.setEnabled(false);
+
+    Spinner bpsSpinner = (Spinner) findViewById(R.id.bps_spinner);
+    int bps = Integer.parseInt(bpsSpinner.getSelectedItem().toString());
+    MainActivity mainActivity = this;
+    Thread thread =
+        new Thread(
+            () -> {
+              encodeAndDecodeMicDataToSpeaker(bps);
+              mainActivity.runOnUiThread(
+                  () -> {
+                    decodeButton.setEnabled(true);
+                    recordButton.setEnabled(true);
+                  });
+            });
+    thread.start();
   }
 
   /** Called when user taps the 'record microphone' button. */
@@ -175,7 +217,9 @@ public class MainActivity extends AppCompatActivity {
     if (!isRecording) {
       isRecording = true;
       // Begin recording, and set the button to be a stop button.
-      ((Button) view).setText("Stop and decode to speaker");
+      ((Button) view).setText("Stop recording");
+      Button decodeButton = (Button) findViewById(R.id.button_decode);
+      decodeButton.setEnabled(false);
       record =
           new AudioRecord.Builder()
               .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
@@ -191,7 +235,6 @@ public class MainActivity extends AppCompatActivity {
       new Thread(this::recordAudioStream).start();
     } else {
       stopRecording();
-      encodeAndDecodeMicDataToSpeaker();
     }
   }
 
@@ -206,11 +249,11 @@ public class MainActivity extends AppCompatActivity {
 
       new Thread(
               () -> {
-                Log.i(TAG, "Starting benchmarkDecode()");
+                Log.i(TAG, "Starting lyraBenchmark()");
                 // Example of a call to a C++ lyra method on a background
                 // thread.
-                benchmarkDecode(2000, weightsDirectory);
-                Log.i(TAG, "Finished benchmarkDecode()");
+                lyraBenchmark(2000, weightsDirectory);
+                Log.i(TAG, "Finished lyraBenchmark()");
                 tv.post(() -> tv.setText("Finished benchmarking. See logcat for results."));
                 button.post(() -> button.setEnabled(true));
                 hasStartedDecode = false;
@@ -222,14 +265,11 @@ public class MainActivity extends AppCompatActivity {
   private void copyWeightsAssetsToDirectory(String targetDirectory) {
     try {
       AssetManager assetManager = getAssets();
-      String[] files = assetManager.list("");
+      String[] files = {"lyra_config.binarypb", "lyragan.tflite",
+        "quantizer.tflite", "soundstream_encoder.tflite"};
       byte[] buffer = new byte[1024];
       int amountRead;
       for (String file : files) {
-        // Lyra weights start with a 'lyra_' prefix.
-        if (!file.startsWith("lyra_")) {
-          continue;
-        }
         InputStream inputStream = assetManager.open(file);
         File outputFile = new File(targetDirectory, file);
 
@@ -251,8 +291,8 @@ public class MainActivity extends AppCompatActivity {
    * A method that is implemented by the 'lyra_android_example' C++ library, which is packaged with
    * this application.
    */
-  public native String benchmarkDecode(int numCondVectors, String modelBasePath);
+  public native String lyraBenchmark(int numCondVectors, String modelBasePath);
 
   public native short[] encodeAndDecodeSamples(
-      short[] samples, int sampleLength, String modelBasePath);
+      short[] samples, int sampleLength, int bitrate, String modelBasePath);
 }

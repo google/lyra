@@ -15,48 +15,37 @@
 #include "lyra_decoder.h"
 
 #include <algorithm>
-#include <bitset>
-#include <climits>
 #include <cstdint>
-#include <iterator>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 // Placeholder for get runfiles header.
-#include "absl/memory/memory.h"
-#include "absl/random/random.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"  // IWYU pragma: keep
 #include "absl/types/span.h"
+#include "buffered_filter_interface.h"
+#include "buffered_resampler.h"
+#include "dsp_utils.h"
+#include "feature_estimator_interface.h"
 #include "generative_model_interface.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
-#include "log_mel_spectrogram_extractor_impl.h"
+#include "lyra_components.h"
 #include "lyra_config.h"
-#include "packet.h"
 #include "packet_interface.h"
-#include "packet_loss_handler_interface.h"
 #include "resampler.h"
-#include "resampler_interface.h"
 #include "testing/mock_generative_model.h"
-#include "testing/mock_packet_loss_handler.h"
-#include "testing/mock_resampler.h"
+#include "testing/mock_noise_estimator.h"
 #include "testing/mock_vector_quantizer.h"
 #include "vector_quantizer_interface.h"
 
 namespace chromemedia {
 namespace codec {
-namespace {
-
-constexpr int kNumQuantizedBits = 120;
-constexpr int kNumHeaderBits = 0;
-
-}  // namespace
 
 // Use a test peer to access the private constructor of LyraDecoder in order
 // to inject a MockGenerativeModel.
@@ -66,33 +55,35 @@ class LyraDecoderPeer {
       std::unique_ptr<MockGenerativeModel> mock_generative_model,
       std::unique_ptr<MockGenerativeModel> mock_comfort_noise_generator,
       std::unique_ptr<MockVectorQuantizer> mock_vector_quantizer,
-      std::unique_ptr<MockPacketLossHandler> mock_packet_loss_handler,
-      std::unique_ptr<ResamplerInterface> resampler, int sample_rate_hz,
-      int num_frames_per_packet)
+      std::unique_ptr<MockNoiseEstimator> mock_noise_estimator,
+      std::unique_ptr<FeatureEstimatorInterface> feature_estimator,
+      std::unique_ptr<BufferedFilterInterface> buffered_resampler,
+      int external_sample_rate_hz)
       : decoder_(std::move(mock_generative_model),
                  std::move(mock_comfort_noise_generator),
                  std::move(mock_vector_quantizer),
-                 absl::make_unique<Packet<kNumQuantizedBits, kNumHeaderBits>>(),
-                 std::move(mock_packet_loss_handler), std::move(resampler),
-                 sample_rate_hz, kNumChannels, kBitrate,
-                 num_frames_per_packet) {}
+                 std::move(mock_noise_estimator), std::move(feature_estimator),
+                 std::move(buffered_resampler), external_sample_rate_hz,
+                 kNumChannels) {}
 
   bool SetEncodedPacket(const absl::Span<const uint8_t> encoded) {
     return decoder_.SetEncodedPacket(encoded);
   }
 
-  absl::optional<std::vector<int16_t>> DecodeSamples(int num_samples) {
+  std::optional<std::vector<int16_t>> DecodeSamples(int num_samples) {
     return decoder_.DecodeSamples(num_samples);
   }
 
-  absl::optional<std::vector<int16_t>> DecodePacketLoss(int num_samples) {
-    return decoder_.DecodePacketLoss(num_samples);
+  void SetConcealmentProgress(int samples) {
+    decoder_.concealment_progress_ = samples;
   }
 
-  absl::optional<std::vector<int16_t>> OverlapFrames(
-      const std::vector<int16_t>& preceding_frame,
-      const std::vector<int16_t>& following_frame) {
-    return decoder_.OverlapFrames(preceding_frame, following_frame);
+  void SetFadeProgress(int samples) { decoder_.fade_progress_ = samples; }
+
+  void SetFadeToCNG() { decoder_.fade_direction_ = LyraDecoder::kFadeToCNG; }
+
+  void SetFadeFromCNG() {
+    decoder_.fade_direction_ = LyraDecoder::kFadeFromCNG;
   }
 
  private:
@@ -101,714 +92,723 @@ class LyraDecoderPeer {
 
 namespace {
 
+using testing::Exactly;
 using testing::Return;
 
-static constexpr absl::string_view kExportedModelPath = "wavegru";
+static constexpr absl::string_view kExportedModelPath = "model_coeffs";
+
+// Duration of pure packet loss concealment.
+inline int GetConcealmentDurationSamples() {
+  static constexpr float kConcealmentDurationSeconds = 0.08;
+  static constexpr int kConcealmentDurationSamples =
+      kConcealmentDurationSeconds * kInternalSampleRateHz;
+  CHECK_EQ(
+      kConcealmentDurationSamples % GetNumSamplesPerHop(kInternalSampleRateHz),
+      0);
+  return kConcealmentDurationSamples;
+}
+
+// Duration it takes to fade from concealment to comfort noise, and from
+// comfort noise to received packets.
+inline int GetFadeDurationSamples() {
+  static constexpr float kFadeDurationSeconds = 0.04;
+  static constexpr int kFadeDurationSamples =
+      kFadeDurationSeconds * kInternalSampleRateHz;
+  CHECK_EQ(kFadeDurationSamples % GetNumSamplesPerHop(kInternalSampleRateHz),
+           0);
+  return kFadeDurationSamples;
+}
 
 class LyraDecoderTest
     : public testing::TestWithParam<testing::tuple<int, int>> {
  protected:
-  typedef Packet<kNumQuantizedBits, kNumHeaderBits> PacketType;
+  enum ModelTypeSamples {
+    kGenerative = -10000,
+    kComfort = 10000,
+    kFade = 20000,
+  };
 
   LyraDecoderTest()
-      : sample_rate_hz_(std::get<0>(GetParam())),
-        num_frames_per_packet_(std::get<1>(GetParam())),
+      : external_sample_rate_hz_(std::get<0>(GetParam())),
+        num_quantized_bits_(std::get<1>(GetParam())),
+        external_num_samples_per_hop_(
+            GetNumSamplesPerHop(external_sample_rate_hz_)),
+        internal_num_samples_per_hop_(
+            GetNumSamplesPerHop(kInternalSampleRateHz)),
+        concealment_duration_packets_(GetConcealmentDurationSamples() /
+                                      internal_num_samples_per_hop_),
+        fade_duration_packets_(GetFadeDurationSamples() /
+                               internal_num_samples_per_hop_),
+        quantized_zeros_(num_quantized_bits_, '0'),
+        packet_(CreatePacket(kNumHeaderBits, num_quantized_bits_)),
+        encoded_zeros_(packet_->PackQuantized(quantized_zeros_)),
         model_path_(ghc::filesystem::current_path() / kExportedModelPath),
-        mock_concatenated_features_(num_frames_per_packet_ * kNumFeatures),
-        mock_feature_frames_(num_frames_per_packet_),
-        mock_samples_(
-            GetNumSamplesPerHop(GetInternalSampleRate(sample_rate_hz_))),
-        output_mock_samples_(GetNumSamplesPerHop(sample_rate_hz_)) {
-    // Fill |mock_concatenated_features_| with monotonically increasing values
-    // at each index.
-    std::iota(mock_concatenated_features_.begin(),
-              mock_concatenated_features_.end(), 0);
-
-    // Organize |mock_concatenated_features_| into frames.
-    for (int i = 0; i < num_frames_per_packet_; ++i) {
-      mock_feature_frames_[i] = std::vector<float>(
-          mock_concatenated_features_.begin() + kNumFeatures * i,
-          mock_concatenated_features_.begin() + kNumFeatures * (i + 1));
-    }
-
+        mock_features_(kNumFeatures),
+        mock_noise_features_(kNumMelBins),
+        mock_samples_(internal_num_samples_per_hop_),
+        generative_model_mock_samples_(internal_num_samples_per_hop_,
+                                       ModelTypeSamples::kGenerative),
+        comfort_noise_generator_mock_samples_(internal_num_samples_per_hop_,
+                                              ModelTypeSamples::kComfort) {
+    // Fill |mock_features_| and |mock_noise_features_| with monotonically
+    // increasing values at each index, with a constant offset from one another.
+    std::iota(mock_features_.begin(), mock_features_.end(), 0);
+    std::iota(mock_noise_features_.begin(), mock_noise_features_.end(), 10.f);
     // Fill |mock_samples_| with monotonically increasing values at each index.
     std::iota(mock_samples_->begin(), mock_samples_->end(), 0);
-    // Fill |output_mock_samples_| with monotonically increasing values at each
-    // index.
-    std::iota(output_mock_samples_.begin(), output_mock_samples_.end(), 0);
   }
 
-  std::unique_ptr<MockResampler> GetResampler(int num_calls) {
-    auto resampler = absl::make_unique<MockResampler>();
-    if (GetInternalSampleRate(sample_rate_hz_) == sample_rate_hz_) {
-      EXPECT_CALL(*resampler,
-                  Resample(absl::MakeConstSpan(mock_samples_.value())))
-          .Times(0);
-    } else {
-      EXPECT_CALL(*resampler,
-                  Resample(absl::MakeConstSpan(mock_samples_.value())))
-          .Times(testing::Exactly(num_calls))
-          .WillRepeatedly(Return(output_mock_samples_));
+  void SetUp() override {
+    mock_generative_model_ = std::make_unique<MockGenerativeModel>(
+        ModelTypeSamples::kGenerative, internal_num_samples_per_hop_,
+        kNumFeatures);
+    mock_comfort_noise_generator_ = std::make_unique<MockGenerativeModel>(
+        ModelTypeSamples::kComfort, internal_num_samples_per_hop_, kNumMelBins);
+    mock_vector_quantizer_ = std::make_unique<MockVectorQuantizer>();
+    mock_noise_estimator_ = std::make_unique<MockNoiseEstimator>();
+    feature_estimator_ = CreateFeatureEstimator(kNumFeatures);
+    buffered_resampler_ = BufferedResampler::Create(kInternalSampleRateHz,
+                                                    external_sample_rate_hz_);
+    real_resampler_ =
+        Resampler::Create(kInternalSampleRateHz, external_sample_rate_hz_);
+  }
+
+  void CreateDecoder() {
+    lyra_decoder_peer_ = std::make_unique<LyraDecoderPeer>(
+        std::move(mock_generative_model_),
+        std::move(mock_comfort_noise_generator_),
+        std::move(mock_vector_quantizer_), std::move(mock_noise_estimator_),
+        std::move(feature_estimator_), std::move(buffered_resampler_),
+        external_sample_rate_hz_);
+  }
+
+  // The packet loss mechanism can be thought of as a 6-state machine.
+  // State 1: Normal decoding.
+  //   Possible transitions functions:
+  //    a-> Stay in State 1, while samples are available from received packets.
+  //    b-> Transition to State 2, if more samples requested than available from
+  //        received packets.
+  // State 2: Pure concealment.
+  //   Possible transitions functions:
+  //    a-> Stay in State 2, while we have not received a packet and have not
+  //        exceeded the pure concealment duration.
+  //    b-> Transition to State 3, while we have not received a packet and have
+  //        exceeded the pure concealment duration.
+  //    c-> Transition to State 1, if we have received a packet.
+  // State 3: Fade from concealment to comfort noise.
+  //   Possible transitions functions:
+  //    a-> Stay in State 3, while we have not received a packet and have not
+  //        exceeded the fade duration.
+  //    b-> Transition to State 4, while we have not received a packet and have
+  //        exceeded the fade duration.
+  //    c-> Transition to State 6, if we have received a packet.
+  // State 4: Pure comfort noise generation.
+  //   Possible transitions functions:
+  //    a-> Stay in State 4, while we have not received a packet.
+  //    b-> Transition to State 5, if we have received a packet.
+  // State 5: Fade from comfort noise to normal decoding.
+  //   Possible transitions functions:
+  //    a-> Stay in State 5, while we receive packets and have not exceeded the
+  //        fade duration.
+  //    b-> Transition to State 1, if we have not lost a packet and have
+  //    exceeded
+  //        the fade duration.
+  //    c-> Transition to State 6, if we have lost a packet.
+  // State 6: Fade from comfort noise to concealment.
+  //   Possible transitions functions:
+  //    a-> Stay in State 6, while we do not receive packets and have not
+  //    exceeded the fade duration.
+  //    b-> Transition to State 5, if we have received a packet and have not
+  //        exceeded the fade duration.
+  //    c-> Transition to State 2, if do not receive a packet and have exceeded
+  //        the fade duration.
+  // State transitions only occur at |GetNumSamplesPerHop(kInternalSampleRate)|
+  // intervals, meaning if we have decoded at least one sample from a
+  // concealment 'packet' from State 2 and then receive a real packet, we must
+  // completley play out the remaining samples from concealment 'packet' before
+  // transitioning back to State 1.
+  // TODO(b/227492039): Add tests for State 5->6 and 3->5 when hop size
+  // decreases.
+
+  void ExpectSetEncodedPacket(int num_calls) {
+    EXPECT_CALL(*mock_vector_quantizer_,
+                DecodeToLossyFeatures(quantized_zeros_))
+        .Times(Exactly(num_calls))
+        .WillRepeatedly(Return(mock_features_));
+    EXPECT_CALL(*mock_generative_model_, AddFeatures(mock_features_))
+        .Times(num_calls);
+  }
+
+  void ExpectNormalDecoding(
+      const std::vector<int16_t>& expected_merged_samples) {
+    EXPECT_CALL(*mock_generative_model_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+    // Zero comfort noise samples requested in normal decoding.
+    EXPECT_CALL(*mock_noise_estimator_, noise_estimate()).Times(Exactly(0));
+    EXPECT_CALL(*mock_comfort_noise_generator_, AddFeatures(::testing::_))
+        .Times(Exactly(0));
+    EXPECT_CALL(*mock_comfort_noise_generator_, GenerateSamples(0))
+        .Times(Exactly(1));
+    EXPECT_CALL(
+        *mock_noise_estimator_,
+        ReceiveSamples(absl::MakeConstSpan(generative_model_mock_samples_)))
+        .Times(Exactly(1))
+        .WillOnce(Return(true));
+  }
+
+  void ExpectConcealment(const std::vector<int16_t>& expected_merged_samples,
+                         bool expect_add_features) {
+    if (expect_add_features) {
+      // Estimated features are added to the model from a concrete class - we
+      // are not concerned with their exact value in this test.
+      EXPECT_CALL(*mock_generative_model_, AddFeatures(::testing::_))
+          .Times(Exactly(1));
     }
-    return resampler;
+    EXPECT_CALL(*mock_generative_model_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+    EXPECT_CALL(*mock_comfort_noise_generator_, GenerateSamples(0))
+        .Times(Exactly(1));
   }
 
-  const int sample_rate_hz_;
-  const int num_frames_per_packet_;
+  void ExpectFadeToComfortNoise(
+      const std::vector<int16_t>& expected_merged_samples,
+      bool expect_add_features) {
+    if (expect_add_features) {
+      // Still using estimated features since we have not received a packet.
+      EXPECT_CALL(*mock_generative_model_, AddFeatures(::testing::_))
+          .Times(Exactly(1));
+    }
+    EXPECT_CALL(*mock_generative_model_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+    // Use the default noise estimate since we have not received a packet.
+    if (expect_add_features) {
+      EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+          .Times(Exactly(1))
+          .WillOnce(Return(mock_noise_features_));
+      EXPECT_CALL(*mock_comfort_noise_generator_,
+                  AddFeatures(mock_noise_features_))
+          .Times(Exactly(1));
+    }
+    EXPECT_CALL(*mock_comfort_noise_generator_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+  }
+
+  void ExpectComfortNoise(const std::vector<int16_t>& expected_merged_samples,
+                          bool expect_add_features) {
+    // Still using estimated features since we have not received a packet.
+    EXPECT_CALL(*mock_generative_model_, AddFeatures(::testing::_))
+        .Times(Exactly(0));
+    EXPECT_CALL(*mock_generative_model_, GenerateSamples(0)).Times(Exactly(1));
+    if (expect_add_features) {
+      EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+          .Times(Exactly(1))
+          .WillOnce(Return(mock_noise_features_));
+      EXPECT_CALL(*mock_comfort_noise_generator_,
+                  AddFeatures(mock_noise_features_))
+          .Times(Exactly(1));
+    }
+    EXPECT_CALL(*mock_comfort_noise_generator_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+  }
+
+  void ExpectFadeToNormalDecoding(
+      const std::vector<int16_t>& expected_merged_samples,
+      bool expect_add_features) {
+    EXPECT_CALL(*mock_generative_model_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+    if (expect_add_features) {
+      EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+          .Times(Exactly(1))
+          .WillOnce(Return(mock_noise_features_));
+      EXPECT_CALL(*mock_comfort_noise_generator_,
+                  AddFeatures(mock_noise_features_))
+          .Times(Exactly(1));
+    }
+    EXPECT_CALL(*mock_comfort_noise_generator_,
+                GenerateSamples(expected_merged_samples.size()))
+        .Times(Exactly(1));
+    // Noise estimator is called on the model output from the received packet.
+    EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(::testing::_))
+        .Times(Exactly(1))
+        .WillOnce(Return(true));
+  }
+
+  std::unique_ptr<LyraDecoderPeer> lyra_decoder_peer_;
+
+  std::unique_ptr<MockGenerativeModel> mock_generative_model_;
+  std::unique_ptr<MockGenerativeModel> mock_comfort_noise_generator_;
+  std::unique_ptr<MockVectorQuantizer> mock_vector_quantizer_;
+  std::unique_ptr<MockNoiseEstimator> mock_noise_estimator_;
+  std::unique_ptr<FeatureEstimatorInterface> feature_estimator_;
+  std::unique_ptr<BufferedFilterInterface> buffered_resampler_;
+
+  std::unique_ptr<Resampler> real_resampler_;
+
+  const int external_sample_rate_hz_;
+  const int num_quantized_bits_;
+  const int external_num_samples_per_hop_;
+  const int internal_num_samples_per_hop_;
+  const int concealment_duration_packets_;
+  const int fade_duration_packets_;
+  const std::string quantized_zeros_;
+  const std::unique_ptr<PacketInterface> packet_;
+  const std::vector<uint8_t> encoded_zeros_;
   const ghc::filesystem::path model_path_;
-  std::vector<float> mock_concatenated_features_;
-  std::vector<std::vector<float>> mock_feature_frames_;
-  absl::optional<std::vector<int16_t>> mock_samples_;
-  std::vector<int16_t> output_mock_samples_;
+  std::vector<float> mock_features_;
+  std::vector<float> mock_noise_features_;
+  std::optional<std::vector<int16_t>> mock_samples_;
+  // Samples returned from the generative_model.
+  std::vector<int16_t> generative_model_mock_samples_;
+  // Samples returned from the comfort noise generator.
+  std::vector<int16_t> comfort_noise_generator_mock_samples_;
 };
 
-TEST_P(LyraDecoderTest, PacketAllZerosSucceeds) {
-  // Fill a packet with the bit pattern 00000000 at each byte.
-  std::bitset<kNumQuantizedBits> quantized(0);
-  PacketType packet;
-  std::vector<uint8_t> encoded = packet.PackQuantized(quantized.to_string());
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  EXPECT_CALL(*mock_vector_quantizer,
-              DecodeToLossyFeatures(quantized.to_string()))
-      .WillOnce(Return(mock_concatenated_features_));
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  for (const auto& mock_features : mock_feature_frames_) {
-    EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(mock_features))
-        .WillOnce(Return(true));
-    EXPECT_CALL(*mock_generative_model, AddFeatures(mock_features));
-  }
-  const int num_requested_samples = output_mock_samples_.size();
-  const int num_samples_to_generate = mock_samples_->size();
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(num_samples_to_generate))
-      .WillOnce(Return(mock_samples_));
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(1), sample_rate_hz_, num_frames_per_packet_);
+// Test State 1: Normal decoding. -> State 2 -> State 1: Normal decoding.
+TEST_P(LyraDecoderTest, EntirePacketRequests_NormalToConcealmentToNormal) {
+  const int kNumRequests = 3;
+  std::vector<std::vector<int16_t>> expected_merged_samples(kNumRequests);
+  expected_merged_samples.at(0) = std::vector<int16_t>(
+      internal_num_samples_per_hop_, ModelTypeSamples::kGenerative);
+  expected_merged_samples.at(1) = expected_merged_samples.at(0);
+  expected_merged_samples.at(2) = expected_merged_samples.at(0);
 
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded));
-  auto decoded_or = lyra_decoder_peer->DecodeSamples(num_requested_samples);
+  std::vector<int> external_sample_requests(kNumRequests,
+                                            external_num_samples_per_hop_);
 
-  ASSERT_TRUE(decoded_or.has_value());
-  EXPECT_EQ(decoded_or.value(), output_mock_samples_);
-}
+  {  // Enforce mocks are called in a specific order.
+    ::testing::InSequence in;
+    ExpectSetEncodedPacket(1);
+    ExpectNormalDecoding(expected_merged_samples.at(0));
 
-TEST_P(LyraDecoderTest, DecodePacketLossWithoutPriorPacketSucceeds) {
-  const std::vector<float> estimated_features(kNumFeatures, 23.0f);
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
+    ExpectConcealment(expected_merged_samples.at(1),
+                      /*expect_add_features=*/true);
 
-  const int internal_num_samples = mock_samples_->size();
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_num_samples))
-      .WillOnce(Return(mock_samples_));
-  EXPECT_CALL(*mock_generative_model, AddFeatures(estimated_features));
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  EXPECT_CALL(*mock_packet_loss_handler,
-              EstimateLostFeatures(internal_num_samples))
-      .WillOnce(Return(estimated_features));
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(1), sample_rate_hz_, num_frames_per_packet_);
-
-  // Without first calling SetEncodedPacket() with any prior packet,
-  // DecodePacketLoss() can still return audio samples.
-  const int num_samples = output_mock_samples_.size();
-  auto decoded_or = lyra_decoder_peer->DecodePacketLoss(num_samples);
-  ASSERT_TRUE(decoded_or.has_value());
-  EXPECT_EQ(decoded_or.value(), output_mock_samples_);
-}
-
-TEST_P(LyraDecoderTest, DecodeSamplesWithoutPriorPacketFails) {
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(testing::_)).Times(0);
-  EXPECT_CALL(*mock_generative_model, AddFeatures(testing::_)).Times(0);
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(0), sample_rate_hz_, num_frames_per_packet_);
-
-  // Without first calling SetEncodedPacket() with any prior packet,
-  // DecodeSamples() does not return audio samples.
-  auto decoded_or =
-      lyra_decoder_peer->DecodeSamples(GetNumSamplesPerHop(sample_rate_hz_));
-  EXPECT_FALSE(decoded_or.has_value());
-}
-
-TEST_P(LyraDecoderTest, PlcSamplesStraddlePacketBoundary) {
-  // Step 1: Add one encoded packet containing N frames.
-  // Step 2: Completely decode N - 1 frames worth of (M) samples.
-  // Step 3: Partially decode the last frame (M - 20 out of M samples).
-  // Step 4: Try and fail to decode more samples than are left (62 vs 20).
-  // Step 5: Make one PLC call requesting 62 samples, which use up all the
-  //         remaining 20 samples from a normal packet and then add new PLC
-  //         features to generate 42 samples.
-  // Step 6: Make one PLC call requesting M - 40 samples, which use up the
-  //         remaining M - 42 samples and then add new PLC features to generate
-  //         2 samples.
-  const int kNumTotalPackets = 3;
-  std::bitset<kNumQuantizedBits> quantized_zeros(0);
-  PacketType packet;
-  std::vector<uint8_t> encoded_zeros =
-      packet.PackQuantized(quantized_zeros.to_string());
-
-  // The vector quantizer will be called only once.
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  EXPECT_CALL(*mock_vector_quantizer,
-              DecodeToLossyFeatures(quantized_zeros.to_string()))
-      .WillOnce(Return(mock_concatenated_features_));
-
-  // Add N frames of features from encoded packet in Step 1.
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  for (const auto& mock_features : mock_feature_frames_) {
-    EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(mock_features))
-        .WillOnce(Return(true));
-    EXPECT_CALL(*mock_generative_model, AddFeatures(mock_features)).Times(1);
+    ExpectSetEncodedPacket(1);
+    ExpectNormalDecoding(expected_merged_samples.at(2));
   }
 
-  // All mocks have their sample vector sizes expressed at
-  // |kInternalSampleRateHz|.
-  // Generate N - 1 frames worth of (M) samples in Step 2.
-  const int internal_frame_size = mock_samples_->size();
-  absl::optional<std::vector<int16_t>> complete_decode_samples_call(
-      {mock_samples_->begin(), mock_samples_->begin() + internal_frame_size});
-  if (num_frames_per_packet_ > 1) {
-    EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_frame_size))
-        .Times(num_frames_per_packet_ - 1)
-        .WillRepeatedly(Return(complete_decode_samples_call));
-  }
+  CreateDecoder();
 
-  // Generate M - 20 samples from the last frame in Step 3.
-  absl::optional<std::vector<int16_t>> decode_samples_call_0(
-      {mock_samples_->begin(),
-       mock_samples_->begin() + internal_frame_size - 20});
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_frame_size - 20))
-      .WillOnce(Return(decode_samples_call_0));
-
-  // Add features estimated by PLC in Step 5 & 6.
-  const std::vector<float> estimated_features(kNumFeatures, 11.0f);
-  EXPECT_CALL(*mock_generative_model, AddFeatures(estimated_features))
-      .Times(kNumTotalPackets - 1);
-
-  // Request 62 samples in PLC mode in Step 5, internally break this up into
-  // two calls: the remaining 20 samples from the normal packet and 42
-  // samples from a PLC packet.
-  absl::optional<std::vector<int16_t>> plc_samples_call_0(
-      {mock_samples_->begin() + internal_frame_size - 20,
-       mock_samples_->begin() + internal_frame_size});
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(20))
-      .WillOnce(Return(plc_samples_call_0));
-  absl::optional<std::vector<int16_t>> plc_samples_call_1(
-      {mock_samples_->begin(), mock_samples_->begin() + 42});
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(42))
-      .WillOnce(Return(plc_samples_call_1));
-
-  // Request M - 40 samples in PLC mode in Step 6, internally break this up into
-  // two calls: the remaining M - 42 samples from the first PLC packet and 2
-  // samples from a second PLC packet.
-  absl::optional<std::vector<int16_t>> plc_samples_call_2(
-      {mock_samples_->begin() + 42,
-       mock_samples_->begin() + internal_frame_size});
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_frame_size - 42))
-      .WillOnce(Return(plc_samples_call_2));
-  absl::optional<std::vector<int16_t>> plc_samples_call_3(
-      {mock_samples_->begin(), mock_samples_->begin() + 2});
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(2))
-      .WillOnce(Return(plc_samples_call_3));
-
-  // Comfort noise generator not involved.
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-
-  // Two estimated features will be used for decoding in Step 5 & 6.
-  EXPECT_CALL(*mock_packet_loss_handler, EstimateLostFeatures(testing::_))
-      .Times(kNumTotalPackets - 1)
-      .WillRepeatedly(Return(estimated_features));
-
-  // Use a real resampler as this test is only concerned with behaviour before
-  // any resampling. We need the real resampler to avoid failing resampling
-  // CHECKs in lyra_decoder.
-  auto resampler = Resampler::Create(GetInternalSampleRate(sample_rate_hz_),
-                                     sample_rate_hz_);
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-
-  // Step 1: Add a packet with N frames.
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_zeros));
-
-  // Step 2: Decode N - 1 complete frames.
-  // The literals in |num_samples_request_*| expressions are at
-  // |kInternalSampleRateHz| and then converted to |sample_rate_hz_| to match
-  // the interface expectation.
-  const int complete_num_samples_request = ConvertNumSamplesBetweenSampleRate(
-      internal_frame_size, GetInternalSampleRate(sample_rate_hz_),
-      sample_rate_hz_);
-  for (int i = 0; i < num_frames_per_packet_ - 1; ++i) {
-    EXPECT_TRUE(lyra_decoder_peer->DecodeSamples(complete_num_samples_request)
-                    .has_value());
-  }
-
-  // Step 3: Decode M - 20 samples from the last frame.
-  const int num_samples_request_0 = ConvertNumSamplesBetweenSampleRate(
-      internal_frame_size - 20, GetInternalSampleRate(sample_rate_hz_),
-      sample_rate_hz_);
-  EXPECT_TRUE(
-      lyra_decoder_peer->DecodeSamples(num_samples_request_0).has_value());
-
-  // Step 4: A |DecodeSamples| request for more than 20 samples should return
-  // nullopt.
-  const int num_samples_request_1 = ConvertNumSamplesBetweenSampleRate(
-      62, GetInternalSampleRate(sample_rate_hz_), sample_rate_hz_);
-  EXPECT_FALSE(
-      lyra_decoder_peer->DecodeSamples(num_samples_request_1).has_value());
-
-  // Step 5: Requesting 62 samples in PLC mode is valid.
-  EXPECT_TRUE(
-      lyra_decoder_peer->DecodePacketLoss(num_samples_request_1).has_value());
-
-  // Step 6: Requesting M - 40 samples in PLC mode is valid too.
-  const int num_samples_request_2 = ConvertNumSamplesBetweenSampleRate(
-      internal_frame_size - 40, GetInternalSampleRate(sample_rate_hz_),
-      sample_rate_hz_);
-  EXPECT_TRUE(lyra_decoder_peer->DecodePacketLoss(num_samples_request_2));
+  // State 1: Normal decoding.
+  ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+  ASSERT_TRUE(
+      lyra_decoder_peer_->DecodeSamples(external_sample_requests.at(0)));
+  // State 2: Concealment.
+  ASSERT_TRUE(
+      lyra_decoder_peer_->DecodeSamples(external_sample_requests.at(1)));
+  // State 1: Normal decoding.
+  ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+  ASSERT_TRUE(
+      lyra_decoder_peer_->DecodeSamples(external_sample_requests.at(2)));
 }
 
-TEST_P(LyraDecoderTest, MultipleLostPackets) {
-  // Requests 3 PLC packets without adding real features.
-  static constexpr int kNumLostPackets = 3;
-  const std::vector<float> estimated_features(kNumFeatures, 17.0f);
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  const int internal_num_samples = mock_samples_->size();
-  // PLC calls are made before any real packets are added.
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_num_samples))
-      .Times(kNumLostPackets)
-      .WillRepeatedly(Return(mock_samples_));
-  EXPECT_CALL(*mock_generative_model, AddFeatures(estimated_features))
-      .Times(kNumLostPackets);
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  EXPECT_CALL(*mock_packet_loss_handler,
-              EstimateLostFeatures(internal_num_samples))
-      .Times(kNumLostPackets)
-      .WillRepeatedly(Return(estimated_features));
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(kNumLostPackets), sample_rate_hz_, num_frames_per_packet_);
-
-  const int num_samples = output_mock_samples_.size();
-  for (int i = 0; i < kNumLostPackets; ++i) {
-    auto decoded_or = lyra_decoder_peer->DecodePacketLoss(num_samples);
-    ASSERT_TRUE(decoded_or.has_value());
-    EXPECT_EQ(decoded_or.value(), output_mock_samples_);
+// State 2: Concealment -> State 3: Fade to comfort noise -> State 4: Comfort
+// noise.
+TEST_P(LyraDecoderTest, TestFinishDecoding_ConcealmentToComfortNoise) {
+  std::vector<std::vector<int16_t>> expected_merged_samples;
+  // State 2: Concealment.
+  for (int i = 0; i < concealment_duration_packets_; ++i) {
+    expected_merged_samples.push_back(std::vector<int16_t>(
+        internal_num_samples_per_hop_, ModelTypeSamples::kGenerative));
   }
-}
+  // State 3: Fade to comfort noise.
+  for (int i = 0; i < fade_duration_packets_; ++i) {
+    expected_merged_samples.push_back(std::vector<int16_t>(
+        internal_num_samples_per_hop_, ModelTypeSamples::kFade));
+  }
+  // State 4: Comfort noise.
+  const int kNumComfortNoisePackets = 3;
+  for (int i = 0; i < kNumComfortNoisePackets; ++i) {
+    expected_merged_samples.push_back(std::vector<int16_t>(
+        internal_num_samples_per_hop_, ModelTypeSamples::kComfort));
+  }
 
-TEST_P(LyraDecoderTest, OneLostPacketMultipleRequests) {
-  // A packet is lost, but there are several calls to DecodePacketLoss(), each
-  // requesting a different number of samples. The total number of samples
-  // requested does not exceed the frame size.
-  std::vector<float> estimated_features(kNumFeatures, 13.0f);
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto resampler = absl::make_unique<MockResampler>();
+  std::vector<int16_t> external_sample_requests(expected_merged_samples.size(),
+                                                external_num_samples_per_hop_);
 
-  // Prepare 4 requested numbers of samples whose sum < frame size M:
-  // 7 + (M / 4 - 15) + (M / 4 + 2) + (M / 2 - 5) <= M - 11.
-  const int frame_size = output_mock_samples_.size();
-  const std::vector<int> num_samples_requested = {
-      7, frame_size / 4 - 15, frame_size / 4 + 2, frame_size / 2 - 5};
-
-  std::vector<std::vector<int16_t>> partial_mock_samples;
-  std::vector<std::vector<int16_t>> partial_output_mock_samples;
-  for (int i = 0; i < num_samples_requested.size(); ++i) {
-    const int internal_num_samples = ConvertNumSamplesBetweenSampleRate(
-        num_samples_requested[i], sample_rate_hz_,
-        GetInternalSampleRate(sample_rate_hz_));
-    partial_mock_samples.push_back(
-        {mock_samples_->begin(),
-         mock_samples_->begin() + internal_num_samples});
-    if (i == 0) {
-      const std::vector<int16_t> kEmptySamples;
-      EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_num_samples))
-          .WillOnce(Return(kEmptySamples))
-          .WillOnce(Return(partial_mock_samples.back()));
-      EXPECT_CALL(*mock_generative_model, AddFeatures(estimated_features));
-    } else {
-      EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_num_samples))
-          .WillOnce(Return(partial_mock_samples.back()));
+  int request_index = 0;
+  {
+    ::testing::InSequence in;
+    // State 2: Concealment.
+    for (int i = 0; i < concealment_duration_packets_; ++i) {
+      ExpectConcealment(expected_merged_samples.at(request_index++),
+                        /*expect_add_features=*/true);
     }
-
-    EXPECT_CALL(*mock_packet_loss_handler,
-                EstimateLostFeatures(internal_num_samples))
-        .WillOnce(Return(estimated_features));
-
-    EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_))
-        .Times(0);
-    EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-        .Times(0);
-
-    // Set expectation for |resampler|.
-    partial_output_mock_samples.push_back(
-        {output_mock_samples_.begin(),
-         output_mock_samples_.begin() + num_samples_requested[i]});
-    if (GetInternalSampleRate(sample_rate_hz_) == sample_rate_hz_) {
-      EXPECT_CALL(*resampler,
-                  Resample(absl::MakeConstSpan(partial_mock_samples.back())))
-          .Times(0);
-    } else {
-      EXPECT_CALL(*resampler,
-                  Resample(absl::MakeConstSpan(partial_mock_samples.back())))
-          .WillOnce(Return(partial_output_mock_samples.back()));
+    // State 3: Fade to comfort noise.
+    for (int i = 0; i < fade_duration_packets_; ++i) {
+      ExpectFadeToComfortNoise(expected_merged_samples.at(request_index++),
+                               /*expect_add_features=*/true);
+    }
+    // State 4: Comfort noise.
+    for (int i = 0; i < kNumComfortNoisePackets; ++i) {
+      ExpectComfortNoise(expected_merged_samples.at(request_index++),
+                         /*expect_add_features=*/true);
     }
   }
 
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-  for (int i = 0; i < num_samples_requested.size(); ++i) {
-    auto decoded_or =
-        lyra_decoder_peer->DecodePacketLoss(num_samples_requested[i]);
-    ASSERT_TRUE(decoded_or.has_value());
-    EXPECT_EQ(decoded_or.value(), partial_output_mock_samples[i]);
+  CreateDecoder();
+
+  request_index = 0;
+  // State 2: Concealment.
+  for (int i = 0; i < concealment_duration_packets_; ++i) {
+    ASSERT_TRUE(
+        lyra_decoder_peer_
+            ->DecodeSamples(external_sample_requests.at(request_index++))
+            .has_value());
+  }
+  // State 3: Fade to comfort noise.
+  for (int i = 0; i < fade_duration_packets_; ++i) {
+    ASSERT_TRUE(
+        lyra_decoder_peer_
+            ->DecodeSamples(external_sample_requests.at(request_index++))
+            .has_value());
+  }
+  // State 4: Comfort noise.
+  for (int i = 0; i < kNumComfortNoisePackets; ++i) {
+    ASSERT_TRUE(
+        lyra_decoder_peer_
+            ->DecodeSamples(external_sample_requests.at(request_index++))
+            .has_value());
   }
 }
 
-TEST_P(LyraDecoderTest, ModelsTransitionsAndTriggerOverlap) {
-  // Test that models transition and are overlapped when necessary. This test is
-  // solely concerned with verifying that overlap happens and does not check for
-  // correctness. The generative model is called once on a packet, then two
-  // packets are lost, then the generative model is called one more time on a
+// State 4: Comfort noise -> SetEncodedPacket -> State 4: Comfort
+// noise -> State 5: Fade to normal.
+TEST_P(LyraDecoderTest, TestFinishDecoding_ComfortNoiseFadetoNormal) {
+  std::vector<std::vector<int16_t>> expected_merged_samples;
+  // State 4: Comfort noise.
+  expected_merged_samples.push_back(
+      std::vector<int16_t>(100, ModelTypeSamples::kComfort));
+  // Packet added here, decode the remainder of the State 4: Comfort noise
   // packet.
-  static constexpr int kNumPacketDecodes = 2;
-  static constexpr int kNumLostPackets = 2;
-  const int internal_num_samples = mock_samples_->size();
-  std::bitset<kNumQuantizedBits> quantized(0);
-  PacketType packet;
-  std::vector<uint8_t> encoded = packet.PackQuantized(quantized.to_string());
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  EXPECT_CALL(*mock_vector_quantizer,
-              DecodeToLossyFeatures(quantized.to_string()))
-      .Times(kNumPacketDecodes)
-      .WillRepeatedly(Return(mock_concatenated_features_));
-
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-
-  // Called in SetEncodedPacket() in Step 1 and 3 below.
-  for (const auto& mock_features : mock_feature_frames_) {
-    EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(mock_features))
-        .Times(kNumPacketDecodes)
-        .WillRepeatedly(Return(true));
-    EXPECT_CALL(*mock_generative_model, AddFeatures(mock_features))
-        .Times(kNumPacketDecodes);
+  expected_merged_samples.push_back(std::vector<int16_t>(
+      internal_num_samples_per_hop_ - 100, ModelTypeSamples::kComfort));
+  // State 5: Fade to normal decoding.
+  for (int i = 0; i < fade_duration_packets_; ++i) {
+    expected_merged_samples.push_back(std::vector<int16_t>(
+        internal_num_samples_per_hop_, ModelTypeSamples::kFade));
   }
 
-  // Called in DecodeSamples() in Step 1 and 3 below, as well as one extra time
-  // in Step 2 below to account for the overlap when transitioning from CNG
-  // to the generative model.
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(internal_num_samples))
-      .Times(kNumPacketDecodes + 1)
-      .WillRepeatedly(Return(mock_samples_));
+  std::vector<int16_t> external_sample_requests(expected_merged_samples.size());
+  std::transform(expected_merged_samples.begin(), expected_merged_samples.end(),
+                 external_sample_requests.begin(),
+                 [this](std::vector<int16_t> internal_samples) {
+                   return ConvertNumSamplesBetweenSampleRate(
+                       internal_samples.size(), kInternalSampleRateHz,
+                       external_sample_rate_hz_);
+                 });
 
-  // In Step 2, in order to account for the overlap, the generative model's
-  // AddFeatures() may be called one extra time using the estimated features.
-  // This happens only if |num_frames_per_packet_| is 1. Otherwise there would
-  // be enough leftover features from the previous packet to generate samples.
-  const std::vector<float> mock_estimated_features(kNumFeatures, 10.0f);
-  if (num_frames_per_packet_ == 1) {
-    EXPECT_CALL(*mock_generative_model, AddFeatures(mock_estimated_features))
-        .Times(1);
+  int request_index = 0;
+  {
+    ::testing::InSequence in;
+    // State 4: Comfort noise, call for 100 samples.
+    ExpectComfortNoise(expected_merged_samples.at(request_index++),
+                       /*expect_add_features=*/true);
+    ExpectSetEncodedPacket(1);
+
+    // State 4: Comfort noise, call for the rest of the comfort noise packet.
+    ExpectComfortNoise(expected_merged_samples.at(request_index++),
+                       /*expect_add_features=*/false);
+    // State 5: Fade to normal decoding, call for the entire packet.
+    for (int i = 0; i < fade_duration_packets_; ++i) {
+      if (i > 0) {
+        ExpectSetEncodedPacket(1);
+      }
+      ExpectFadeToNormalDecoding(expected_merged_samples.at(request_index++),
+                                 /*expect_add_features=*/true);
+    }
   }
 
-  // CNG's AddFeatures() and GenerateSamples() are called |kNumLostPackets|
-  // |kNumLostPackets| times in Step 2, as well as one extra time to account
-  // for the overlap when transitioning from CNG to the generative model.
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator,
-              AddFeatures(mock_estimated_features))
-      .Times(kNumLostPackets + 1);
-  EXPECT_CALL(*mock_comfort_noise_generator,
-              GenerateSamples(internal_num_samples))
-      .Times(kNumLostPackets + 1)
-      .WillRepeatedly(Return(mock_samples_));
+  CreateDecoder();
+  lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+  lyra_decoder_peer_->SetFadeProgress(GetFadeDurationSamples());
+  lyra_decoder_peer_->SetFadeToCNG();
 
-  // This test is not concerned with the behavior of the resampler, so use real
-  // one.
-  auto resampler = Resampler::Create(GetInternalSampleRate(sample_rate_hz_),
-                                     sample_rate_hz_);
-
-  // EstimateLostFeatures() is |kNumLostPackets| times in Step 2 and one extra
-  // time in Step 3 because of the overlap. This extra call does not mess with
-  // the class's internal comfort noise identification logic, as it happens
-  // when the transition is from CNG to the generative model.
-  EXPECT_CALL(*mock_packet_loss_handler,
-              EstimateLostFeatures(internal_num_samples))
-      .Times(kNumLostPackets + 1)
-      .WillRepeatedly(Return(mock_estimated_features));
-  EXPECT_CALL(*mock_packet_loss_handler, is_comfort_noise())
-      .Times(kNumLostPackets)
-      .WillRepeatedly(Return(true));
-
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-
-  // Step 1: Decode a packet with the generative model.
-  const int num_samples = output_mock_samples_.size();
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded));
-  EXPECT_TRUE(lyra_decoder_peer->DecodeSamples(num_samples).has_value());
-
-  // Step 2: Call DecodePacketLoss() |kNumLostPackets| = 2 times to ensure
-  // |prev_frame_was_comfort_noise_| = true. Overlap is expected here.
-  EXPECT_TRUE(lyra_decoder_peer->DecodePacketLoss(num_samples).has_value());
-  EXPECT_TRUE(lyra_decoder_peer->DecodePacketLoss(num_samples).has_value());
-
-  // Step 3: Decode one more packet with the generative model. Overlap is
-  // expected here.
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded));
-  EXPECT_TRUE(lyra_decoder_peer->DecodeSamples(num_samples).has_value());
-}
-
-TEST_P(LyraDecoderTest, FrameSizesDiffer) {
-  // Test that OverlapFrames() does not try to overlap two frames of different
-  // sizes.
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto resampler = absl::make_unique<MockResampler>();
-
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-
-  const int frame_size = output_mock_samples_.size();
-  const std::vector<int16_t> preceding_frame(frame_size, 0.0);
-  const std::vector<int16_t> following_frame(frame_size + 1, 0.0);
-
-  EXPECT_FALSE(
-      lyra_decoder_peer->OverlapFrames(preceding_frame, following_frame)
-          .has_value());
-}
-
-TEST_P(LyraDecoderTest, FramesAreOverlappedCorrectly) {
-  // Test overlap for correctness. Given two frames, where the values of one are
-  // always above the values are the other, the values of the overlapped frame
-  // should land somewhere in between.
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto resampler = absl::make_unique<MockResampler>();
-
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-
-  const int frame_size = output_mock_samples_.size();
-  // Generate random frames, making sure to keep preceding frame values above
-  // following frame values always.
-  absl::BitGen gen;
-  std::vector<int16_t> preceding_frame(frame_size);
-  std::vector<int16_t> following_frame(frame_size);
-  for (int i = 0; i < frame_size; ++i) {
-    preceding_frame[i] = absl::Uniform<int16_t>(gen, 0, 100);
-    following_frame[i] = absl::Uniform<int16_t>(gen, -100, 0);
-  }
-
-  const auto overlapped_frame =
-      lyra_decoder_peer->OverlapFrames(preceding_frame, following_frame);
-  ASSERT_TRUE(overlapped_frame.has_value());
-  for (int i = 0; i < overlapped_frame.value().size(); ++i) {
-    EXPECT_LE(overlapped_frame.value()[i], preceding_frame[i]);
-    EXPECT_GE(overlapped_frame.value()[i], following_frame[i]);
-  }
-}
-
-TEST_P(LyraDecoderTest, OverlapSucceedsWithConsecutiveFramesOfDifferentSize) {
-  // Test that overlaps does not fail given two consecutive frames of different
-  // sizes.
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto resampler = absl::make_unique<MockResampler>();
-
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      std::move(resampler), sample_rate_hz_, num_frames_per_packet_);
-
-  const int frame_size = output_mock_samples_.size();
-  std::vector<int16_t> preceding_frame(frame_size, 0);
-  std::vector<int16_t> following_frame(frame_size, 0);
-  EXPECT_TRUE(lyra_decoder_peer->OverlapFrames(preceding_frame, following_frame)
+  request_index = 0;
+  // Partially decode fake packet, State 4: Comfort noise.
+  ASSERT_TRUE(lyra_decoder_peer_
+                  ->DecodeSamples(external_sample_requests.at(request_index++))
                   .has_value());
-
-  preceding_frame.resize(frame_size + 1);
-  following_frame.resize(frame_size + 1);
-  EXPECT_TRUE(lyra_decoder_peer->OverlapFrames(preceding_frame, following_frame)
+  // Add Packet.
+  ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+  // Finish decoding packet partially started, State 4: Comfort noise.
+  ASSERT_TRUE(lyra_decoder_peer_
+                  ->DecodeSamples(external_sample_requests.at(request_index++))
                   .has_value());
-}
-
-TEST_P(LyraDecoderTest, DecodeLatestPacketOnly) {
-  // Fill a packet with the bit pattern 00000000 at each byte.
-  std::bitset<kNumQuantizedBits> quantized_zeros(0);
-  PacketType packet_zeros;
-  std::vector<uint8_t> encoded_zeros =
-      packet_zeros.PackQuantized(quantized_zeros.to_string());
-
-  // Fill a packet with the bit pattern 11111111 at each byte.
-  std::bitset<kNumQuantizedBits> quantized_ones(0);
-  quantized_ones.flip();
-  PacketType packet_ones;
-  std::vector<uint8_t> encoded_ones =
-      packet_ones.PackQuantized(quantized_ones.to_string());
-
-  // First the all 0s packet is passed to the decoder, then the all 1s packet is
-  // passed to the decoder.
-  const std::vector<float> zeros_concatenated_features(
-      num_frames_per_packet_ * kNumFeatures, 0.0f);
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  EXPECT_CALL(*mock_vector_quantizer,
-              DecodeToLossyFeatures(quantized_zeros.to_string()))
-      .WillOnce(Return(zeros_concatenated_features));
-  EXPECT_CALL(*mock_vector_quantizer,
-              DecodeToLossyFeatures(quantized_ones.to_string()))
-      .WillOnce(Return(mock_concatenated_features_));
-
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  const std::vector<float> zeros_features(kNumFeatures, 0.0f);
-  EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(zeros_features))
-      .Times(num_frames_per_packet_)
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_generative_model, AddFeatures(zeros_features))
-      .Times(num_frames_per_packet_);
-  for (const auto& mock_features : mock_feature_frames_) {
-    EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(mock_features))
-        .WillOnce(Return(true));
-    EXPECT_CALL(*mock_generative_model, AddFeatures(mock_features));
+  // State 5: Fade to normal decoding.
+  for (int i = 0; i < fade_duration_packets_; ++i) {
+    if (i > 0) {
+      ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+    }
+    ASSERT_TRUE(
+        lyra_decoder_peer_
+            ->DecodeSamples(external_sample_requests.at(request_index++))
+            .has_value());
   }
-
-  // The mock generative model should only be run once.
-  const int num_requested_samples = output_mock_samples_.size();
-  const int num_samples_to_generate = mock_samples_->size();
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(num_samples_to_generate))
-      .WillOnce(Return(mock_samples_));
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(1), sample_rate_hz_, num_frames_per_packet_);
-
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_zeros));
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_ones));
-  auto decoded_or = lyra_decoder_peer->DecodeSamples(num_requested_samples);
-  ASSERT_TRUE(decoded_or.has_value());
-  EXPECT_EQ(decoded_or.value(), output_mock_samples_);
 }
 
-TEST_P(LyraDecoderTest, MoreSamplesRequestedThanInAPacket) {
-  // Fill a packet with the bit pattern 00000000 at each byte.
-  std::bitset<kNumQuantizedBits> quantized_zeros(0);
-  PacketType packet;
-  std::vector<uint8_t> encoded_zeros =
-      packet.PackQuantized(quantized_zeros.to_string());
+TEST_P(LyraDecoderTest, MultipleHopsOneRequestNormalDecode) {
+  const int kNumHopsToDecode = 4;
+  std::vector<int16_t> expected_merged_samples(
+      kNumHopsToDecode * internal_num_samples_per_hop_,
+      ModelTypeSamples::kGenerative);
 
-  auto mock_vector_quantizer = absl::make_unique<MockVectorQuantizer>();
-  auto mock_packet_loss_handler = absl::make_unique<MockPacketLossHandler>();
-  auto mock_generative_model = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_packet_loss_handler, SetReceivedFeatures(testing::_))
-      .Times(num_frames_per_packet_)
+  const int sample_request = ConvertNumSamplesBetweenSampleRate(
+      expected_merged_samples.size(), kInternalSampleRateHz,
+      external_sample_rate_hz_);
+
+  ExpectSetEncodedPacket(/*num_calls=*/kNumHopsToDecode);
+
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(::testing::_))
+      .Times(Exactly(kNumHopsToDecode))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_generative_model, AddFeatures(testing::_))
-      .Times(num_frames_per_packet_);
 
-  // Functions expected to not be called due to early exits.
-  EXPECT_CALL(*mock_generative_model, GenerateSamples(testing::_)).Times(0);
-  auto mock_comfort_noise_generator = absl::make_unique<MockGenerativeModel>();
-  EXPECT_CALL(*mock_comfort_noise_generator, AddFeatures(testing::_)).Times(0);
-  EXPECT_CALL(*mock_comfort_noise_generator, GenerateSamples(testing::_))
-      .Times(0);
+  CreateDecoder();
 
-  auto lyra_decoder_peer = absl::make_unique<LyraDecoderPeer>(
-      std::move(mock_generative_model), std::move(mock_comfort_noise_generator),
-      std::move(mock_vector_quantizer), std::move(mock_packet_loss_handler),
-      GetResampler(0), sample_rate_hz_, num_frames_per_packet_);
-  ASSERT_TRUE(lyra_decoder_peer->SetEncodedPacket(encoded_zeros));
+  // Add Packets.
+  for (int i = 0; i < kNumHopsToDecode; ++i) {
+    ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(
+        absl::MakeConstSpan(encoded_zeros_)));
+  }
+  // Decode all |kNumHopsToDecode| at once.
+  ASSERT_TRUE(lyra_decoder_peer_->DecodeSamples(sample_request).has_value());
+}
 
-  // One more sample than there are in a packet.
-  const int num_samples_more_than_packet =
-      num_frames_per_packet_ * GetNumSamplesPerHop(sample_rate_hz_) + 1;
-  auto decoded_or =
-      lyra_decoder_peer->DecodeSamples(num_samples_more_than_packet);
-  EXPECT_FALSE(decoded_or.has_value());
+TEST_P(LyraDecoderTest, HopsAreOverlappedCorrectly) {
+  // Test overlap for correctness. Given two hops, where the values of one
+  // are always above the values are the other, the values of the overlapped
+  // hop should land somewhere in between.
+
+  // Set up expectations for the generative model.
+  EXPECT_CALL(*mock_generative_model_,
+              GenerateSamples(internal_num_samples_per_hop_))
+      .WillRepeatedly(Return(generative_model_mock_samples_));
+  EXPECT_CALL(*mock_generative_model_, GenerateSamples(0))
+      .WillRepeatedly(Return(std::vector<int16_t>()));
+  EXPECT_CALL(*mock_generative_model_, num_samples_available())
+      .WillRepeatedly(Return(internal_num_samples_per_hop_));
+  // Set up expectations for the comfort noise generator.
+  EXPECT_CALL(*mock_comfort_noise_generator_,
+              GenerateSamples(internal_num_samples_per_hop_))
+      .WillRepeatedly(Return(comfort_noise_generator_mock_samples_));
+  EXPECT_CALL(*mock_comfort_noise_generator_, GenerateSamples(0))
+      .WillRepeatedly(Return(std::vector<int16_t>()));
+  EXPECT_CALL(*mock_comfort_noise_generator_, num_samples_available())
+      .WillRepeatedly(Return(internal_num_samples_per_hop_));
+  // Set up expectations for the noise estimator, it receives the generative
+  // model samples when fading from comfort noise to normal decoding.
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(::testing::_))
+      .WillRepeatedly(Return(true));
+
+  // The resampled value may oscillate around the input value.
+  const int kMonotonicityTolerance = 2;
+  // The resampler FIR filter will not reach steady state immediately.
+  const int kSamplesUntilSteadyState =
+      real_resampler_->samples_until_steady_state();
+
+  const std::vector<int16_t> expected_concealment_samples =
+      kInternalSampleRateHz == external_sample_rate_hz_
+          ? generative_model_mock_samples_
+          : real_resampler_->Resample(generative_model_mock_samples_);
+  const std::vector<int16_t> expected_comfort_noise_samples =
+      kInternalSampleRateHz == external_sample_rate_hz_
+          ? comfort_noise_generator_mock_samples_
+          : real_resampler_->Resample(comfort_noise_generator_mock_samples_);
+
+  CreateDecoder();
+
+  // Request samples without adding a packet.
+  auto samples =
+      lyra_decoder_peer_->DecodeSamples(external_num_samples_per_hop_);
+  ASSERT_TRUE(samples.has_value());
+  // State 2: Concealment should return all generative model output from the
+  // fade.
+  EXPECT_EQ(samples.value(), expected_concealment_samples);
+  // State 3: Fade to comfort noise should fade from generative model samples
+  // to comfort noise samples.
+  lyra_decoder_peer_->SetFadeProgress(0);
+  lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+  lyra_decoder_peer_->SetFadeToCNG();
+  samples = lyra_decoder_peer_->DecodeSamples(external_num_samples_per_hop_);
+  ASSERT_TRUE(samples.has_value());
+  for (int i = kSamplesUntilSteadyState; i < samples->size(); ++i) {
+    EXPECT_GE(samples->at(i), expected_concealment_samples.at(i))
+        << "Expecting faded samples to be greater than or equal to generative"
+           "model samples at index "
+        << i;
+    EXPECT_LE(samples->at(i), expected_comfort_noise_samples.at(i))
+        << "Expecting faded samples to be less than or equal to comfort noise"
+           "samples at index "
+        << i;
+    if (i > 0) {
+      EXPECT_GE(samples->at(i), samples->at(i - 1) - kMonotonicityTolerance)
+          << "Samples should be monotonically increasing at index " << i;
+    }
+  }
+  // State 4: Comfort noise should be all comfort noise samples.
+  lyra_decoder_peer_->SetFadeProgress(GetFadeDurationSamples());
+  lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+  lyra_decoder_peer_->SetFadeToCNG();
+  samples = lyra_decoder_peer_->DecodeSamples(external_num_samples_per_hop_);
+  ASSERT_TRUE(samples.has_value());
+  EXPECT_EQ(std::vector<int16_t>(samples->begin() + kSamplesUntilSteadyState,
+                                 samples->end()),
+            std::vector<int16_t>(expected_comfort_noise_samples.begin() +
+                                     kSamplesUntilSteadyState,
+                                 expected_comfort_noise_samples.end()));
+  // State 5: Fade to normal decoding noise should fade from comfort noise to
+  // generative model samples.
+  lyra_decoder_peer_->SetFadeProgress(GetFadeDurationSamples());
+  lyra_decoder_peer_->SetConcealmentProgress(0);
+  lyra_decoder_peer_->SetFadeFromCNG();
+  samples = lyra_decoder_peer_->DecodeSamples(external_num_samples_per_hop_);
+  ASSERT_TRUE(samples.has_value());
+  for (int i = kSamplesUntilSteadyState; i < samples->size(); ++i) {
+    EXPECT_GE(samples->at(i), expected_concealment_samples.at(i))
+        << "Expecting faded samples to be greater than or equal to generative"
+           "model samples at index "
+        << i;
+    EXPECT_LE(samples->at(i), expected_comfort_noise_samples.at(i))
+        << "Expecting faded samples to be less than or equal to comfort noise"
+           "samples at index "
+        << i;
+    if (i > 0) {
+      EXPECT_LE(samples->at(i), samples->at(i - 1) + kMonotonicityTolerance)
+          << "Samples should be monotonically decreasing at index " << i;
+    }
+  }
+}
+
+TEST_P(LyraDecoderTest, ArbitraryNumSamplesNormalDecode) {
+  ExpectSetEncodedPacket(external_num_samples_per_hop_);
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(::testing::_))
+      .WillRepeatedly(Return(true));
+  CreateDecoder();
+
+  for (int num_samples = 0; num_samples < external_num_samples_per_hop_;
+       ++num_samples) {
+    lyra_decoder_peer_->SetFadeProgress(0);
+    lyra_decoder_peer_->SetConcealmentProgress(0);
+    lyra_decoder_peer_->SetFadeFromCNG();
+    ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+    auto samples = lyra_decoder_peer_->DecodeSamples(num_samples);
+    ASSERT_TRUE(samples.has_value());
+    EXPECT_EQ(samples->size(), num_samples)
+        << "Could not generate " << num_samples
+        << " samples in normal decoding mode.";
+  }
+}
+
+TEST_P(LyraDecoderTest, ArbitraryNumSamplesConcealment) {
+  CreateDecoder();
+
+  for (int num_samples = 0; num_samples < external_num_samples_per_hop_;
+       ++num_samples) {
+    lyra_decoder_peer_->SetFadeProgress(0);
+    lyra_decoder_peer_->SetConcealmentProgress(1);
+    lyra_decoder_peer_->SetFadeFromCNG();
+    auto samples = lyra_decoder_peer_->DecodeSamples(num_samples);
+    ASSERT_TRUE(samples.has_value());
+    EXPECT_EQ(samples->size(), num_samples)
+        << "Could not generate " << num_samples
+        << " samples in concealment mode.";
+  }
+}
+
+TEST_P(LyraDecoderTest, ArbitraryNumSamplesComfortNoise) {
+  EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+      .WillRepeatedly(Return(mock_noise_features_));
+  CreateDecoder();
+
+  for (int num_samples = 0; num_samples < external_num_samples_per_hop_;
+       ++num_samples) {
+    lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+    lyra_decoder_peer_->SetFadeProgress(GetFadeDurationSamples());
+    lyra_decoder_peer_->SetFadeToCNG();
+    auto samples = lyra_decoder_peer_->DecodeSamples(num_samples);
+    ASSERT_TRUE(samples.has_value());
+    EXPECT_EQ(samples->size(), num_samples)
+        << "Could not generate " << num_samples
+        << " samples in comfort noise mode .";
+  }
+}
+
+TEST_P(LyraDecoderTest, ArbitraryNumSamplesFadeToComfortNoise) {
+  EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+      .WillRepeatedly(Return(mock_noise_features_));
+  CreateDecoder();
+
+  for (int num_samples = 0; num_samples < external_num_samples_per_hop_;
+       ++num_samples) {
+    lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+    lyra_decoder_peer_->SetFadeProgress(0);
+    lyra_decoder_peer_->SetFadeToCNG();
+    auto samples = lyra_decoder_peer_->DecodeSamples(num_samples);
+    ASSERT_TRUE(samples.has_value());
+    EXPECT_EQ(samples->size(), num_samples)
+        << "Could not generate " << num_samples
+        << " samples while fading to comfort noise.";
+  }
+}
+
+TEST_P(LyraDecoderTest, ArbitraryNumSamplesFadeFromComfortNoise) {
+  ExpectSetEncodedPacket(external_num_samples_per_hop_);
+  EXPECT_CALL(*mock_noise_estimator_, ReceiveSamples(::testing::_))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(*mock_noise_estimator_, noise_estimate())
+      .WillRepeatedly(Return(mock_noise_features_));
+  CreateDecoder();
+
+  for (int num_samples = 0; num_samples < external_num_samples_per_hop_;
+       ++num_samples) {
+    lyra_decoder_peer_->SetConcealmentProgress(GetConcealmentDurationSamples());
+    lyra_decoder_peer_->SetFadeProgress(GetFadeDurationSamples());
+    lyra_decoder_peer_->SetFadeFromCNG();
+    ASSERT_TRUE(lyra_decoder_peer_->SetEncodedPacket(encoded_zeros_));
+
+    auto samples = lyra_decoder_peer_->DecodeSamples(num_samples);
+    ASSERT_TRUE(samples.has_value());
+    EXPECT_EQ(samples->size(), num_samples)
+        << "Could not generate " << num_samples
+        << " samples while fading from comfort noise.";
+  }
+}
+
+TEST_P(LyraDecoderTest, ValidConfig) {
+  EXPECT_NE(
+      LyraDecoder::Create(external_sample_rate_hz_, kNumChannels, model_path_),
+      nullptr);
 }
 
 TEST_P(LyraDecoderTest, InvalidConfig) {
   for (const auto& invalid_num_channels : {-1, 0, 2}) {
-    EXPECT_EQ(LyraDecoder::Create(sample_rate_hz_, invalid_num_channels,
-                                  kBitrate, model_path_),
-              nullptr);
-  }
-  for (const auto& invalid_bitrates : {-1, 0}) {
-    EXPECT_EQ(LyraDecoder::Create(sample_rate_hz_, kNumChannels,
-                                  invalid_bitrates, model_path_),
+    EXPECT_EQ(LyraDecoder::Create(external_sample_rate_hz_,
+                                  invalid_num_channels, model_path_),
               nullptr);
   }
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    SampleRateAndNumFramePerPacket, LyraDecoderTest,
+    SampleRateQuantizedBitsAndNumHopsPerPacket, LyraDecoderTest,
     testing::Combine(testing::ValuesIn(kSupportedSampleRates),
-                     testing::Values(1, 2, 3)));
+                     testing::ValuesIn(GetSupportedQuantizedBits())));
 
 TEST(LyraDecoderCreate, InvalidCreateReturnsNullptr) {
   for (const auto& invalid_sample_rate : {0, -1, 16001}) {
-    EXPECT_EQ(LyraDecoder::Create(invalid_sample_rate, kNumChannels, kBitrate,
+    EXPECT_EQ(LyraDecoder::Create(invalid_sample_rate, kNumChannels,
                                   kExportedModelPath),
               nullptr);
   }
   for (const auto& valid_sample_rate : kSupportedSampleRates) {
-    EXPECT_EQ(LyraDecoder::Create(valid_sample_rate, kNumChannels, kBitrate,
-                                  "/does/not/exist"),
-              nullptr);
+    EXPECT_EQ(
+        LyraDecoder::Create(valid_sample_rate, kNumChannels, "/does/not/exist"),
+        nullptr);
   }
 }
 

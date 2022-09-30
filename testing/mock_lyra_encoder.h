@@ -32,8 +32,10 @@ class MockLyraEncoder : public LyraEncoderInterface {
  public:
   ~MockLyraEncoder() override {}
 
-  MOCK_METHOD(absl::optional<std::vector<uint8_t>>, Encode,
+  MOCK_METHOD(std::optional<std::vector<uint8_t>>, Encode,
               (const absl::Span<const int16_t>), (override));
+
+  MOCK_METHOD(bool, set_bitrate, (int bitrate), (override));
 
   MOCK_METHOD(int, sample_rate_hz, (), (const, override));
 

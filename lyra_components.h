@@ -17,13 +17,9 @@
 #ifndef LYRA_CODEC_LYRA_COMPONENTS_H_
 #define LYRA_CODEC_LYRA_COMPONENTS_H_
 
-#include <cstdint>
 #include <memory>
-#include <vector>
 
-#include "Eigen/Core"
-#include "absl/status/statusor.h"
-#include "denoiser_interface.h"
+#include "feature_estimator_interface.h"
 #include "feature_extractor_interface.h"
 #include "generative_model_interface.h"
 #include "include/ghc/filesystem.hpp"
@@ -34,27 +30,21 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    int num_output_features, int num_bits,
-    const ghc::filesystem::path& model_path);
-
-std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    int num_features, int num_bits, const Eigen::RowVectorXf& mean_vector,
-    const Eigen::MatrixXf& transformation_matrix,
-    const std::vector<float>& code_vectors,
-    const std::vector<int16_t>& codebook_dimensions);
+    int num_output_features, const ghc::filesystem::path& model_path);
 
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
-    int num_samples_per_hop, int num_output_features, int num_frames_per_packet,
+    int num_samples_per_hop, int num_output_features,
     const ghc::filesystem::path& model_path);
 
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(
     int sample_rate_hz, int num_features, int num_samples_per_hop,
-    int num_samples_per_frame);
+    int num_samples_per_window, const ghc::filesystem::path& model_path);
 
-absl::StatusOr<std::unique_ptr<DenoiserInterface>> CreateDenoiser(
-    const ghc::filesystem::path& model_path);
+std::unique_ptr<PacketInterface> CreatePacket(int num_header_bits,
+                                              int num_quantized_bits);
 
-std::unique_ptr<PacketInterface> CreatePacket();
+std::unique_ptr<FeatureEstimatorInterface> CreateFeatureEstimator(
+    int num_features);
 
 }  // namespace codec
 }  // namespace chromemedia

@@ -15,12 +15,12 @@
  limitations under the License.
 -->
 
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.android.bazel.MainActivity">
+    tools:context="com.example.android.lyra.MainActivity">
 
     <TextView
         android:id="@+id/sample_text"
@@ -32,16 +32,6 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
     <Button
-        android:id="@+id/button_record"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/button_record"
-        android:onClick="onMicButtonClicked"
-        app:layout_constraintBottom_toBottomOf="@id/sample_text"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="@id/button_benchmark" />
-    <Button
         android:id="@+id/button_benchmark"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -51,4 +41,41 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-</android.support.constraint.ConstraintLayout>
+    <Button
+        android:id="@+id/button_record"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/button_record"
+        android:onClick="onMicButtonClicked"
+        app:layout_constraintBottom_toBottomOf="@id/bps_spinner"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="@id/button_benchmark" />
+    <TextView
+        android:id="@+id/bps_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bits Per Second:"
+        app:layout_constraintBottom_toBottomOf="@id/button_decode"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="@id/bps_spinner"
+        app:layout_constraintTop_toTopOf="@id/button_record" />
+    <Spinner
+        android:id="@+id/bps_spinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="@id/button_decode"
+        app:layout_constraintLeft_toLeftOf="@id/bps_text"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="@id/button_record" />
+    <Button
+        android:id="@+id/button_decode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/button_decode"
+        android:onClick="onDecodeButtonClicked"
+        app:layout_constraintBottom_toBottomOf="@id/sample_text"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="@id/button_benchmark" />
+</androidx.constraintlayout.widget.ConstraintLayout>

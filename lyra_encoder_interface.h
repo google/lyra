@@ -18,9 +18,9 @@
 #define LYRA_CODEC_LYRA_ENCODER_INTERFACE_H_
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace chromemedia {
@@ -33,8 +33,10 @@ class LyraEncoderInterface {
 
   // Returns the audio samples encoded. Returns nullptrt
   // on failure.
-  virtual absl::optional<std::vector<uint8_t>> Encode(
+  virtual std::optional<std::vector<uint8_t>> Encode(
       const absl::Span<const int16_t> audio) = 0;
+
+  virtual bool set_bitrate(int bitrate) = 0;
 
   virtual int sample_rate_hz() const = 0;
 

@@ -17,11 +17,13 @@
 #include <bitset>
 #include <climits>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "gtest/gtest.h"
 
@@ -34,8 +36,8 @@ class PacketTest : public testing::Test {
   // Used by several tests. Unrelated to what Lyra actually uses.
   static constexpr int kNumHeaderBits = 8;
   static constexpr int kNumQuantizedBits = 104;
-  static constexpr int kPacketSize =
-      (kNumHeaderBits + kNumQuantizedBits) / CHAR_BIT;
+  static constexpr int kMaxNumPacketBits = kNumHeaderBits + kNumQuantizedBits;
+  static constexpr int kPacketSize = kMaxNumPacketBits / CHAR_BIT;
 
   bool DoesPacketContainQuantized(const std::vector<uint8_t>& packet,
                                   const std::string& quantized_string,
@@ -58,17 +60,41 @@ class PacketTest : public testing::Test {
   }
 };
 
+TEST_F(PacketTest, MaxNumPacketBitsTooLow) {
+  constexpr int kNumHeaderBitsTest = 8;
+  constexpr int kNumQuantizedBitsTest = 56;
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest - 1;
+  EXPECT_EQ(nullptr, Packet<kMaxNumPacketBitsTest>::Create(
+                         kNumHeaderBitsTest, kNumQuantizedBitsTest));
+}
+
+TEST_F(PacketTest, MaxNumPacketBitsLargeEnough) {
+  constexpr int kNumHeaderBitsTest = 8;
+  constexpr int kNumQuantizedBitsTest = 56;
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest + 1;
+  EXPECT_NE(nullptr, Packet<kMaxNumPacketBitsTest>::Create(
+                         kNumHeaderBitsTest, kNumQuantizedBitsTest));
+}
+
 TEST_F(PacketTest, PacketSize) {
   constexpr int kNumHeaderBitsTest = 7;
   constexpr int kNumQuantizedBitsTest = 52;
-  Packet<kNumQuantizedBitsTest, kNumHeaderBitsTest> packet;
-  EXPECT_EQ(packet.PacketSize(),
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest;
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBitsTest);
+  ASSERT_NE(packet, nullptr);
+  EXPECT_EQ(packet->PacketSize(),
             ExpectedPacketSize(kNumQuantizedBitsTest, kNumHeaderBitsTest));
 }
 
 TEST_F(PacketTest, UnpackVariableHeader) {
   constexpr int kNumHeaderBitsTest = 3;
   constexpr int kNumQuantizedBitsTest = 16;
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest;
 
   // Create packet with header set to 0s, bits set to 1s.
   std::vector<uint8_t> encoded = {
@@ -78,28 +104,36 @@ TEST_F(PacketTest, UnpackVariableHeader) {
   };
   std::bitset<kNumQuantizedBitsTest> expected_bits("1111111111111111");
 
-  Packet<kNumQuantizedBitsTest, kNumHeaderBitsTest> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_EQ(expected_bits.to_string(), unpacked_or.value());
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBitsTest);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_EQ(expected_bits.to_string(), unpacked.value());
 }
 
 TEST_F(PacketTest, UnpackNoTrailingZeros) {
   // Create packet. (kNumHeaderBitsTest + kNumQuantizedBitsTest) % CHAR_BIT = 0.
   constexpr int kNumHeaderBitsTest = 2;
   constexpr int kNumQuantizedBitsTest = 22;
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest;
   std::vector<uint8_t> encoded(3, 0b11111111);
   encoded[0] = 0b00111111;  // Set header
   std::bitset<kNumQuantizedBitsTest> expected_bits("1111111111111111111111");
 
-  Packet<kNumQuantizedBitsTest, kNumHeaderBitsTest> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_EQ(expected_bits.to_string(), unpacked_or.value());
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBitsTest);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_EQ(expected_bits.to_string(), unpacked.value());
 }
 
 TEST_F(PacketTest, UnpackBigHeader) {
   // Create packet with header set to 0s, bits set to 1s.
   constexpr int kNumHeaderBitsTest = 22;
   constexpr int kNumQuantizedBitsTest = 22;
+  constexpr int kMaxNumPacketBitsTest =
+      kNumHeaderBitsTest + kNumQuantizedBitsTest;
   std::vector<uint8_t> encoded = {
       0b00000000, 0b00000000, 0b00000011, 0b11111111, 0b11111111,
       0b11110000,  // (kNumHeaderBitsTest + kNumQuantizedBitsTest) % CHAR_BIT =
@@ -107,18 +141,22 @@ TEST_F(PacketTest, UnpackBigHeader) {
   };
   std::bitset<kNumQuantizedBitsTest> expected_bits("1111111111111111111111");
 
-  Packet<kNumQuantizedBitsTest, kNumHeaderBitsTest> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_EQ(expected_bits.to_string(), unpacked_or.value());
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBitsTest);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_EQ(expected_bits.to_string(), unpacked.value());
 }
 
 TEST_F(PacketTest, UnpackQuantizedBitsAllOnes) {
   std::vector<uint8_t> encoded(kPacketSize, 0b11111111);
   encoded[0] = 0b00000000;  // Zero out header.
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked_or.value(),
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked.value(),
                                          kNumHeaderBits, kNumQuantizedBits));
 }
 
@@ -133,9 +171,11 @@ TEST_F(PacketTest, UnpackQuantizedBitsAlternatingBytesOfOnesAndZeros) {
     encoded[i] = 0b11111111;
   }
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked_or.value(),
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked.value(),
                                          kNumHeaderBits, kNumQuantizedBits));
 }
 
@@ -143,28 +183,35 @@ TEST_F(PacketTest, UnpackQuantizedBitsAlternatingOnesAndZeros) {
   std::vector<uint8_t> encoded(kPacketSize, 0b10101010);
   encoded[0] = 0b00000000;  // Zero out header.
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
-  const auto unpacked_or = packet.UnpackPacket(absl::MakeConstSpan(encoded));
-  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked_or.value(),
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked = packet->UnpackPacket(absl::MakeConstSpan(encoded));
+  EXPECT_TRUE(DoesPacketContainQuantized(encoded, unpacked.value(),
                                          kNumHeaderBits, kNumQuantizedBits));
 }
 
 TEST_F(PacketTest, InvalidPacketSize) {
   std::vector<uint8_t> invalid_packet(kPacketSize - 1, 0b11111111);
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
-  const auto unpacked_or =
-      packet.UnpackPacket(absl::MakeConstSpan(invalid_packet));
-  EXPECT_FALSE(unpacked_or.has_value());
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
+  const auto unpacked =
+      packet->UnpackPacket(absl::MakeConstSpan(invalid_packet));
+  EXPECT_FALSE(unpacked.has_value());
 }
 
 TEST_F(PacketTest, PackVariableHeader) {
   std::bitset<kNumQuantizedBits> quantized(0);
   quantized.flip();
   constexpr int kNumHeaderBitsTest = 10;
+  constexpr int kMaxNumPacketBitsTest = kNumHeaderBitsTest + kNumQuantizedBits;
 
-  Packet<kNumQuantizedBits, kNumHeaderBitsTest> packet;
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
   const std::vector<uint8_t> encoded =
-      packet.PackQuantized(quantized.to_string());
+      packet->PackQuantized(quantized.to_string());
   EXPECT_EQ(encoded.size(),
             ExpectedPacketSize(kNumQuantizedBits, kNumHeaderBitsTest));
   EXPECT_TRUE(DoesPacketContainQuantized(
@@ -175,9 +222,11 @@ TEST_F(PacketTest, PackQuantizedBitsAllOnes) {
   std::bitset<kNumQuantizedBits> quantized(0);
   quantized.flip();
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
   const std::vector<uint8_t> encoded =
-      packet.PackQuantized(quantized.to_string());
+      packet->PackQuantized(quantized.to_string());
   EXPECT_EQ(encoded.size(), kPacketSize);
   EXPECT_TRUE(DoesPacketContainQuantized(encoded, quantized.to_string(),
                                          kNumHeaderBits, kNumQuantizedBits));
@@ -190,9 +239,11 @@ TEST_F(PacketTest, PackQuantizedBitsAlternatingOnesAndZeros) {
     quantized.flip(i);
   }
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
   const std::vector<uint8_t> encoded =
-      packet.PackQuantized(quantized.to_string());
+      packet->PackQuantized(quantized.to_string());
   EXPECT_EQ(encoded.size(), kPacketSize);
   EXPECT_TRUE(DoesPacketContainQuantized(encoded, quantized.to_string(),
                                          kNumHeaderBits, kNumQuantizedBits));
@@ -211,9 +262,11 @@ TEST_F(PacketTest, PackQuantizedBitsAlternateBytesOfOnesAndZeros) {
     }
   }
 
-  Packet<kNumQuantizedBits, kNumHeaderBits> packet;
+  auto packet =
+      Packet<kMaxNumPacketBits>::Create(kNumHeaderBits, kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
   const std::vector<uint8_t> encoded =
-      packet.PackQuantized(quantized.to_string());
+      packet->PackQuantized(quantized.to_string());
   EXPECT_EQ(encoded.size(), kPacketSize);
   EXPECT_TRUE(DoesPacketContainQuantized(encoded, quantized.to_string(),
                                          kNumHeaderBits, kNumQuantizedBits));
@@ -233,10 +286,13 @@ TEST_F(PacketTest, PackBigHeader) {
   }
 
   constexpr int kNumHeaderBitsTest = 100;
+  constexpr int kMaxNumPacketBitsTest = kNumHeaderBitsTest + kNumQuantizedBits;
 
-  Packet<kNumQuantizedBits, kNumHeaderBitsTest> packet;
+  auto packet = Packet<kMaxNumPacketBitsTest>::Create(kNumHeaderBitsTest,
+                                                      kNumQuantizedBits);
+  ASSERT_NE(packet, nullptr);
   const std::vector<uint8_t> encoded =
-      packet.PackQuantized(quantized.to_string());
+      packet->PackQuantized(quantized.to_string());
   EXPECT_EQ(encoded.size(),
             ExpectedPacketSize(kNumQuantizedBits, kNumHeaderBitsTest));
   EXPECT_TRUE(DoesPacketContainQuantized(
