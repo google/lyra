@@ -37,6 +37,13 @@ git_repository(
     name = "com_google_absl",
     remote = "https://github.com/abseil/abseil-cpp.git",
     tag = "20211102.0",
+    # Remove after https://github.com/abseil/abseil-cpp/issues/326 is solved.
+    patches = [
+        "@//third_party:com_google_absl_f863b622fe13612433fdf43f76547d5edda0c93001.diff"
+    ],
+    patch_args = [
+        "-p1",
+    ]
 )
 
 # Filesystem
