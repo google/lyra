@@ -32,7 +32,8 @@ namespace codec {
 class TfLiteModelWrapper {
  public:
   static std::unique_ptr<TfLiteModelWrapper> Create(
-      const ghc::filesystem::path& model_file, bool use_xnn);
+      const ghc::filesystem::path& model_file, bool use_xnn,
+      bool int8_quantized);
 
   bool Invoke();
 

@@ -30,18 +30,26 @@ namespace codec {
 namespace {
 
 TEST(TfLiteModelWrapperTest, CreateFailsWithInvalidModelFile) {
-  EXPECT_EQ(TfLiteModelWrapper::Create("invalid/model/path", true), nullptr);
+  EXPECT_EQ(TfLiteModelWrapper::Create("invalid/model/path", true, false),
+            nullptr);
 }
 
-TEST(TfliteUtilsTest, CreateSucceedsAndMethodsRun) {
+class TfLiteModelWrapperTest : public testing::TestWithParam<bool> {};
+
+TEST_P(TfLiteModelWrapperTest, CreateSucceedsAndMethodsRun) {
+  const bool int8_quantized = GetParam();
   auto model_wrapper = TfLiteModelWrapper::Create(
-      ghc::filesystem::current_path() / "model_coeffs/lyragan.tflite", true);
+      ghc::filesystem::current_path() / "model_coeffs/lyragan.tflite", true,
+      int8_quantized);
   ASSERT_NE(model_wrapper, nullptr);
   absl::Span<float> input = model_wrapper->get_input_tensor<float>(0);
   std::fill(input.begin(), input.end(), 0);
   EXPECT_TRUE(model_wrapper->Invoke());
   EXPECT_TRUE(model_wrapper->ResetVariableTensors());
 }
+
+INSTANTIATE_TEST_SUITE_P(Int8QuantizedOrNot, TfLiteModelWrapperTest,
+                         testing::Bool());
 
 }  // namespace
 }  // namespace codec

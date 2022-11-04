@@ -30,15 +30,13 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    int num_output_features, const ghc::filesystem::path& model_path);
-
-std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
-    int num_samples_per_hop, int num_output_features,
     const ghc::filesystem::path& model_path);
 
+std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
+    int num_output_features, const ghc::filesystem::path& model_path);
+
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(
-    int sample_rate_hz, int num_features, int num_samples_per_hop,
-    int num_samples_per_window, const ghc::filesystem::path& model_path);
+    const ghc::filesystem::path& model_path);
 
 std::unique_ptr<PacketInterface> CreatePacket(int num_header_bits,
                                               int num_quantized_bits);

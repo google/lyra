@@ -36,7 +36,8 @@ namespace codec {
 std::unique_ptr<ResidualVectorQuantizer> ResidualVectorQuantizer::Create(
     const ghc::filesystem::path& model_path) {
   auto quantizer_model =
-      TfLiteModelWrapper::Create(model_path / "quantizer.tflite", false);
+      TfLiteModelWrapper::Create(model_path / "quantizer.tflite",
+                                 /*use_xnn=*/false, /*int8_quantized=*/false);
   if (quantizer_model == nullptr) {
     LOG(ERROR) << "Unable to create the quantizer TfLite model wrapper.";
     return nullptr;

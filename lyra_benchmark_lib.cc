@@ -159,8 +159,8 @@ std::optional<std::vector<int16_t>> MaybeRunGenerativeModel(
   return decoded;
 }
 
-// Prints stats and writes CSV for the runtime information in |timings| to file
-// under /{sdcard,tmp}/benchmark/lyra/.
+// Prints stats for the runtime information in |timings|. For desktop, also
+// writes to CSV files under /tmp/benchmark/.
 void PrintStatsAndWriteCSV(const std::vector<int64_t>& timings,
                            const absl::string_view title) {
   constexpr absl::string_view stats_template =
@@ -210,19 +210,15 @@ int lyra_benchmark(const int num_cond_vectors,
   const std::string model_path = GetCompleteArchitecturePath(model_base_path);
 
   std::unique_ptr<FeatureExtractorInterface> feature_extractor =
-      benchmark_feature_extraction
-          ? CreateFeatureExtractor(
-                kInternalSampleRateHz, kNumFeatures, num_samples_per_hop,
-                GetNumSamplesPerWindow(kInternalSampleRateHz), model_path)
-          : nullptr;
+      benchmark_feature_extraction ? CreateFeatureExtractor(model_path)
+                                   : nullptr;
 
   std::unique_ptr<VectorQuantizerInterface> vector_quantizer =
-      benchmark_quantizer ? CreateQuantizer(kNumFeatures, model_path) : nullptr;
+      benchmark_quantizer ? CreateQuantizer(model_path) : nullptr;
 
   std::unique_ptr<GenerativeModelInterface> model =
       benchmark_generative_model
-          ? CreateGenerativeModel(GetNumSamplesPerHop(kInternalSampleRateHz),
-                                  kNumFeatures, model_path)
+          ? CreateGenerativeModel(kNumFeatures, model_path)
           : nullptr;
 
   std::vector<int64_t> feature_extractor_timings;

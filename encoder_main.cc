@@ -32,7 +32,8 @@ ABSL_FLAG(std::string, output_dir, "",
           "name as the wav file they come from with a '.lyra' postfix. Will "
           "overwrite existing files.");
 ABSL_FLAG(int, bitrate, 3200,
-          "The bitrate in bps with which to quantize the file.");
+          "The bitrate in bps with which to quantize the file.  The "
+          "bitrate options can be seen in lyra_encoder.h");
 ABSL_FLAG(bool, enable_preprocessing, false,
           "If enabled runs the input signal through the preprocessing "
           "module before encoding.");
@@ -41,8 +42,10 @@ ABSL_FLAG(bool, enable_dtx, false,
           "when noise is detected.");
 ABSL_FLAG(std::string, model_path, "model_coeffs",
           "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like '/sdcard/model_coeffs/'. For desktop this is "
-          "the path relative to the binary.");
+          "absolute path, like "
+          "'/data/local/tmp/model_coeffs/'. For "
+          "desktop "
+          "this is the path relative to the binary.");
 
 int main(int argc, char** argv) {
   absl::SetProgramUsageMessage(argv[0]);

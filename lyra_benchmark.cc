@@ -27,8 +27,10 @@ ABSL_FLAG(int, num_cond_vectors, 2000,
 
 ABSL_FLAG(std::string, model_path, "model_coeffs",
           "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like '/sdcard/model_coeffs/'. For desktop this is "
-          "the path relative to the binary.");
+          "absolute path, like "
+          "'/data/local/tmp/model_coeffs/'. For "
+          "desktop "
+          "this is the path relative to the binary.");
 
 ABSL_FLAG(bool, benchmark_feature_extraction, true,
           "Whether to benchmark the feature extraction.");

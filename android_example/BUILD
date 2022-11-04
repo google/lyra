@@ -1,5 +1,7 @@
 load("@rules_android//android:rules.bzl", "android_binary", "android_library")
 
+# Placeholder for jni import
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
