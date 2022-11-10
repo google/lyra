@@ -39,7 +39,7 @@ git_repository(
     tag = "20211102.0",
     # Remove after https://github.com/abseil/abseil-cpp/issues/326 is solved.
     patches = [
-        "@//third_party:com_google_absl_f863b622fe13612433fdf43f76547d5edda0c93001.diff"
+        "@//patches:com_google_absl_f863b622fe13612433fdf43f76547d5edda0c93001.diff"
     ],
     patch_args = [
         "-p1",
@@ -174,12 +174,8 @@ git_repository(
 )
 
 # Check bazel version requirement, which is stricter than TensorFlow's.
-load(
-    "@org_tensorflow//tensorflow:version_check.bzl",
-    "check_bazel_version_at_least",
-)
-
-check_bazel_version_at_least("3.7.2")
+load("@bazel_skylib//lib:versions.bzl", "versions")
+versions.check("3.7.2")
 
 # TF WORKSPACE Loading functions
 # This section uses a subset of the tensorflow WORKSPACE loading by reusing its contents.

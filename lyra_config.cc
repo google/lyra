@@ -24,23 +24,23 @@ namespace codec {
 // The Lyra version is |kVersionMajor|.|kVersionMinor|.|kVersionMicro|
 // The version is not used internally, but clients may use it to configure
 // behavior, such as checking for version bumps that break the bitstream.
-// The major version should be bumped whenever the bitstream breaks.
+// The major version should be bumped for major architectural changes.
 const int kVersionMajor = 1;
-// |kVersionMinor| needs to be increased every time a new version requires a
+// The minor version needs to be increased every time a new version requires a
 // simultaneous change in code and weights or if the bit stream is modified. The
 // |identifier| field needs to be set in lyra_config.textproto to match this.
-const int kVersionMinor = 2;
+const int kVersionMinor = 3;
 // The micro version is for other things like a release of bugfixes.
 const int kVersionMicro = 0;
 
 const int kNumFeatures = 64;
 const int kNumMelBins = 160;
 const int kNumChannels = 1;
-const int kFrameRate = 50;
 const int kOverlapFactor = 2;
 
 // LINT.IfChange
 const int kNumHeaderBits = 0;
+const int kFrameRate = 50;
 const std::vector<int>& GetSupportedQuantizedBits() {
   static const std::vector<int>* const supported_quantization_bits =
       new std::vector<int>{64, 120, 184};
@@ -48,6 +48,7 @@ const std::vector<int>& GetSupportedQuantizedBits() {
 }
 // LINT.ThenChange(
 // lyra_components.cc,
+// lyra_encoder.h,
 // residual_vector_quantizer.h,
 // )
 

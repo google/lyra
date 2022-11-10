@@ -35,7 +35,9 @@ namespace codec {
 
 std::unique_ptr<LyraGanModel> LyraGanModel::Create(
     const ghc::filesystem::path& model_path, int num_features) {
-  auto model = TfLiteModelWrapper::Create(model_path / "lyragan.tflite", true);
+  auto model =
+      TfLiteModelWrapper::Create(model_path / "lyragan.tflite",
+                                 /*use_xnn=*/true, /*int8_quantized=*/true);
   if (model == nullptr) {
     LOG(ERROR) << "Unable to create LyraGAN TFLite model wrapper.";
     return nullptr;
@@ -52,11 +54,6 @@ bool LyraGanModel::RunConditioning(const std::vector<float>& features) {
   absl::Span<float> input = model_->get_input_tensor<float>(0);
   std::copy(features.begin(), features.end(), input.begin());
   model_->Invoke();
-  for (int i = 1; i < model_->num_input_tensors(); ++i) {
-    absl::Span<float> input_state = model_->get_input_tensor<float>(i);
-    absl::Span<const float> output_state = model_->get_output_tensor<float>(i);
-    std::copy(output_state.begin(), output_state.end(), input_state.begin());
-  }
   return true;
 }
 

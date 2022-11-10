@@ -34,7 +34,8 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
-    const ghc::filesystem::path& model_file, bool use_xnn) {
+    const ghc::filesystem::path& model_file, bool use_xnn,
+    bool int8_quantized) {
   auto model = tflite::FlatBufferModel::BuildFromFile(model_file.c_str());
   if (model == nullptr) {
     LOG(ERROR) << "Could not build TFLite FlatBufferModel for file: "
@@ -62,6 +63,9 @@ std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
   if (use_xnn) {
     // Enable XXNPack.
     auto options = TfLiteXNNPackDelegateOptionsDefault();
+    if (int8_quantized) {
+      options.flags |= TFLITE_XNNPACK_DELEGATE_FLAG_QS8;
+    }
     options.num_threads = 1;
     auto delegate =
         std::unique_ptr<TfLiteDelegate, std::function<void(TfLiteDelegate*)> >(

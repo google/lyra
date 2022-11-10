@@ -220,7 +220,6 @@ TEST_P(LyraEncoderTest, ReceiveSamplesSucceeds) {
 
   LyraEncoderPeer encoder_peer(
       std::move(mock_resampler_), std::move(mock_feature_extractor_),
-
       std::move(mock_noise_estimator_), std::move(mock_vector_quantizer_),
       external_sample_rate_hz_, num_quantized_bits_,
       /*enable_dtx=*/true);

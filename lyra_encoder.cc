@@ -64,19 +64,13 @@ std::unique_ptr<LyraEncoder> LyraEncoder::Create(
     }
   }
 
-  const int internal_samples_per_hop =
-      GetNumSamplesPerHop(kInternalSampleRateHz);
-  const int internal_samples_per_window =
-      GetNumSamplesPerWindow(kInternalSampleRateHz);
-  auto feature_extractor = CreateFeatureExtractor(
-      kInternalSampleRateHz, kNumFeatures, internal_samples_per_hop,
-      internal_samples_per_window, model_path);
+  auto feature_extractor = CreateFeatureExtractor(model_path);
   if (feature_extractor == nullptr) {
     LOG(ERROR) << "Could not create Features Extractor.";
     return nullptr;
   }
 
-  auto vector_quantizer = CreateQuantizer(kNumFeatures, model_path);
+  auto vector_quantizer = CreateQuantizer(model_path);
   if (vector_quantizer == nullptr) {
     LOG(ERROR) << "Could not create Vector Quantizer.";
     return nullptr;
@@ -84,9 +78,9 @@ std::unique_ptr<LyraEncoder> LyraEncoder::Create(
 
   std::unique_ptr<NoiseEstimatorInterface> noise_estimator = nullptr;
   if (enable_dtx) {
-    noise_estimator =
-        NoiseEstimator::Create(sample_rate_hz, internal_samples_per_hop,
-                               internal_samples_per_window, kNumMelBins);
+    noise_estimator = NoiseEstimator::Create(
+        sample_rate_hz, GetNumSamplesPerHop(kInternalSampleRateHz),
+        GetNumSamplesPerWindow(kInternalSampleRateHz), kNumMelBins);
     if (noise_estimator == nullptr) {
       LOG(ERROR) << "Could not create Noise Estimator.";
       return nullptr;
@@ -127,9 +121,7 @@ std::optional<std::vector<uint8_t>> LyraEncoder::Encode(
     audio_for_encoding = absl::MakeConstSpan(processed);
   }
 
-  const int internal_samples_per_hop =
-      GetNumSamplesPerHop(kInternalSampleRateHz);
-  if (audio_for_encoding.size() != internal_samples_per_hop) {
+  if (audio_for_encoding.size() != GetNumSamplesPerHop(kInternalSampleRateHz)) {
     LOG(ERROR) << "The number of audio samples has to be exactly "
                << GetNumSamplesPerHop(sample_rate_hz_) << ", but is "
                << audio.size() << ".";

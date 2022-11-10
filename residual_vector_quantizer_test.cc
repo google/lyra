@@ -107,7 +107,7 @@ TEST_P(ResidualVectorQuantizerTest, EncodeDecodeResultsInSimilarFeatures) {
   auto decoded_features = quantizer_->DecodeToLossyFeatures(quantized.value());
   ASSERT_TRUE(decoded_features.has_value());
   EXPECT_EQ(decoded_features.value().size(), features_.size());
-  EXPECT_LT(FeatureDistance(decoded_features.value()), 1.1);
+  EXPECT_LT(FeatureDistance(decoded_features.value()), 1.11);
 }
 
 INSTANTIATE_TEST_SUITE_P(NumQuantizedBits, ResidualVectorQuantizerTest,

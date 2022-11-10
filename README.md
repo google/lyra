@@ -154,15 +154,15 @@ If you press 'Benchmark', you should see something like the following in logcat
 on a Pixel 6 Pro when running the benchmark:
 
 ```shell
-lyra_benchmark:  feature_extractor:  max: 0.685 ms  min: 0.206 ms  mean: 0.219 ms  stdev: 0.000 ms
-lyra_benchmark: quantizer_quantize:  max: 0.250 ms  min: 0.076 ms  mean: 0.082 ms  stdev: 0.000 ms
-lyra_benchmark:   quantizer_decode:  max: 0.152 ms  min: 0.027 ms  mean: 0.030 ms  stdev: 0.001 ms
-lyra_benchmark:       model_decode:  max: 0.560 ms  min: 0.223 ms  mean: 0.237 ms  stdev: 0.000 ms
-lyra_benchmark:              total:  max: 1.560 ms  min: 0.541 ms  mean: 0.569 ms  stdev: 0.005 ms
+lyra_benchmark:  feature_extractor:  max: 0.575 ms  min: 0.131 ms  mean: 0.139 ms  stdev: 0.004 ms
+lyra_benchmark: quantizer_quantize:  max: 0.304 ms  min: 0.105 ms  mean: 0.109 ms  stdev: 0.002 ms
+lyra_benchmark:   quantizer_decode:  max: 0.103 ms  min: 0.025 ms  mean: 0.026 ms  stdev: 0.000 ms
+lyra_benchmark:       model_decode:  max: 0.462 ms  min: 0.187 ms  mean: 0.197 ms  stdev: 0.001 ms
+lyra_benchmark:              total:  max: 1.160 ms  min: 0.452 ms  mean: 0.473 ms  stdev: 0.009 ms
 ```
 
 This shows that decoding a 50Hz frame (each frame is 20 milliseconds) takes
-0.569 milliseconds on average. So decoding is performed at around 35 (20/0.569)
+0.473 milliseconds on average. So decoding is performed at around 42 (20/0.473)
 times faster than realtime.
 
 To build your own android app, you can either use the cc_library target outputs
@@ -262,9 +262,10 @@ class LyraEncoder : public LyraEncoderInterface {
 
 The static `Create` method instantiates a `LyraEncoder` with the desired sample
 rate in Hertz, number of channels and bitrate, as long as those parameters are
-supported. Else it returns a nullptr. The `Create` method also needs to know if
-DTX should be enabled and where the model weights are stored. It also checks
-that these weights exist and are compatible with the current Lyra version.
+supported (see `lyra_encoder.h` for supported parameters). Otherwise it returns
+a nullptr. The `Create` method also needs to know if DTX should be enabled and
+where the model weights are stored. It also checks that these weights exist and
+are compatible with the current Lyra version.
 
 Given a `LyraEncoder`, any audio stream can be compressed using the `Encode`
 method. The provided span of int16-formatted samples is assumed to contain 20ms

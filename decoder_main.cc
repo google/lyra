@@ -52,8 +52,10 @@ ABSL_FLAG(chromemedia::codec::PacketLossPattern, fixed_packet_loss_pattern,
           "|packet_loss_rate| and |average_burst_length|.");
 ABSL_FLAG(std::string, model_path, "model_coeffs",
           "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like '/sdcard/model_coeffs/'. For desktop this is "
-          "the path relative to the binary.");
+          "absolute path, like "
+          "'/data/local/tmp/model_coeffs/'. For "
+          "desktop "
+          "this is the path relative to the binary.");
 
 int main(int argc, char** argv) {
   absl::SetProgramUsageMessage(argv[0]);
