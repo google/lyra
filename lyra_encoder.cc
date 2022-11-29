@@ -133,10 +133,9 @@ std::optional<std::vector<uint8_t>> LyraEncoder::Encode(
       LOG(ERROR) << "Unable to update encoder noise estimator.";
       return std::nullopt;
     }
-    // We send an empty packet only if this hop is just noise.
+    // We return nullopt if this hop is just noise.
     if (noise_estimator_->is_noise()) {
-      auto empty_packet = Packet<0>::Create(0, 0);
-      return empty_packet->PackQuantized(std::bitset<0>{}.to_string());
+      return std::nullopt;
     }
   }
 
