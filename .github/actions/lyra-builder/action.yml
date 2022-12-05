@@ -20,17 +20,17 @@ runs:
     - shell: bash
       run: |
         export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-        bazel build -c opt :encoder_main ${{ inputs.build-options }}
+        bazel build -c opt lyra/cli_example:encoder_main ${{ inputs.build-options }}
     - shell: bash
       run: |
         export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-        bazel build -c opt :decoder_main ${{ inputs.build-options }}
+        bazel build -c opt lyra/cli_example:decoder_main ${{ inputs.build-options }}
     - shell: bash
       run: |
         mkdir action-product
-        cp -r model_coeffs action-product/
-        cp bazel-bin/encoder_main action-product/lyra-encoder
-        cp bazel-bin/decoder_main action-product/lyra-decoder
+        cp -r lyra/model_coeffs action-product/
+        cp bazel-bin/lyra/cli_example/encoder_main action-product/lyra-encoder
+        cp bazel-bin/lyra/cli_example/decoder_main action-product/lyra-decoder
     - uses: actions/upload-artifact@v2
       with:
         name: lyra-${{ inputs.platform }}-${{ inputs.architecture }}

@@ -18,12 +18,12 @@ jobs:
         shell: bash
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+          bazel build lyra/android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
       - name: Copy artifacts
         shell: bash
         run: |
           mkdir action-product
-          cp bazel-bin/android_example/lyra_android_example.apk action-product/lyra_example.apk
+          cp bazel-bin/lyra/android_example/lyra_android_example.apk action-product/lyra_example.apk
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:

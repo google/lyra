@@ -1,0 +1,32 @@
+<!--
+ Copyright 2021 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<resources>
+  <string name="app_name"
+          description="App name displayed on activity [CHAR_LIMIT=100]">Lyra Example App</string>
+  <string name="button_record"
+          description="Label for button to record mic [CHAR_LIMIT=100]">Record from microphone</string>
+  <string name="button_benchmark"
+          description="Label for button to run benchmarks [CHAR_LIMIT=100]">Benchmark</string>
+  <string name="button_decode"
+          description="Label for button to decode to speaker [CHAR_LIMIT=100]">Encode/decode to speaker</string>
+  <string name="button_stop"
+          description="Label when recording should stop [CHAR_LIMIT=100]">Stop recording</string>
+  <string name="benchmark_in_progress"
+          description="Shown after user presses benchmark button until the benchmark background process finishes [CHAR_LIMIT=100]">Benchmark in progress. See logcat output for progress.</string>
+  <string name="benchmark_finished"
+          description="Shown after background benchmark process completes [CHAR_LIMIT=100]">Finished benchmarking. See logcat for results.</string>
+</resources>

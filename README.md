@@ -98,7 +98,7 @@ You can build the cc_binaries with the default config. `encoder_main` is an
 example of a file encoder.
 
 ```shell
-bazel build -c opt :encoder_main
+bazel build -c opt lyra/cli_example:encoder_main
 ```
 
 You can run `encoder_main` to encode a test .wav file with some speech in it,
@@ -107,15 +107,15 @@ encoded (compressed) representation, and the desired bitrate can be specified
 using the `--bitrate` flag.
 
 ```shell
-bazel-bin/encoder_main --input_path=testdata/sample1_16kHz.wav --output_dir=$HOME/temp --bitrate=3200
+bazel-bin/lyra/cli_example/encoder_main --input_path=lyra/testdata/sample1_16kHz.wav --output_dir=$HOME/temp --bitrate=3200
 ```
 
 Similarly, you can build decoder_main and use it on the output of encoder_main
 to decode the encoded data back into speech.
 
 ```shell
-bazel build -c opt :decoder_main
-bazel-bin/decoder_main --encoded_path=$HOME/temp/sample1_16kHz.lyra --output_dir=$HOME/temp/ --bitrate=3200
+bazel build -c opt lyra/cli_example:decoder_main
+bazel-bin/lyra/cli_example/decoder_main --encoded_path=$HOME/temp/sample1_16kHz.lyra --output_dir=$HOME/temp/ --bitrate=3200
 ```
 
 Note: the default Bazel toolchain is automatically configured and likely uses
@@ -137,8 +137,8 @@ benchmark that encodes and decodes in the background and prints the timings to
 logcat.
 
 ```shell
-bazel build -c opt android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
-adb install bazel-bin/android_example/lyra_android_example.apk
+bazel build -c opt lyra/android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+adb install bazel-bin/lyra/android_example/lyra_android_example.apk
 ```
 
 After this you should see an app called "Lyra Example App".
@@ -182,8 +182,8 @@ and decoding .wav files.
 You can build the example cc_binary targets with:
 
 ```shell
-bazel build -c opt :encoder_main --config=android_arm64
-bazel build -c opt :decoder_main --config=android_arm64
+bazel build -c opt lyra/cli_example:encoder_main --config=android_arm64
+bazel build -c opt lyra/cli_example:decoder_main --config=android_arm64
 ```
 
 This builds an executable binary that can be run on android 64-bit arm devices
@@ -192,10 +192,10 @@ a binary through the shell.
 
 ```shell
 # Push the binary and the data it needs, including the model and .wav files:
-adb push bazel-bin/encoder_main /data/local/tmp/
-adb push bazel-bin/decoder_main /data/local/tmp/
-adb push model_coeffs/ /data/local/tmp/
-adb push testdata/ /data/local/tmp/
+adb push bazel-bin/lyra/cli_example/encoder_main /data/local/tmp/
+adb push bazel-bin/lyra/cli_example/decoder_main /data/local/tmp/
+adb push lyra/model_coeffs/ /data/local/tmp/
+adb push lyra/testdata/ /data/local/tmp/
 
 adb shell
 cd /data/local/tmp
@@ -230,7 +230,7 @@ section once this is completed.
 ## API
 
 For integrating Lyra into any project only two APIs are relevant:
-[LyraEncoder](lyra_encoder.h) and [LyraDecoder](lyra_decoder.h).
+[LyraEncoder](lyra/lyra_encoder.h) and [LyraDecoder](lyra/lyra_decoder.h).
 
 > DISCLAIMER: At this time Lyra's API and bit-stream are **not** guaranteed to
 > be stable and might change in future versions of the code.
@@ -324,7 +324,7 @@ predetermined parameters.
 
 For an example on how to use `LyraEncoder` and `LyraDecoder` to encode and
 decode a stream of audio, please refer to the
-[integration test](lyra_integration_test.cc).
+[integration test](lyra/lyra_integration_test.cc).
 
 ## License
 
