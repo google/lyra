@@ -31,7 +31,7 @@ const int kVersionMajor = 1;
 // |identifier| field needs to be set in lyra_config.textproto to match this.
 const int kVersionMinor = 3;
 // The micro version is for other things like a release of bugfixes.
-const int kVersionMicro = 1;
+const int kVersionMicro = 2;
 
 const int kNumFeatures = 64;
 const int kNumMelBins = 160;
