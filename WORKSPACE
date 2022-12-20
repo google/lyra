@@ -168,9 +168,9 @@ maven_install(
 git_repository(
     name = "org_tensorflow",
     remote = "https://github.com/tensorflow/tensorflow.git",
-    # Below is reproducible and equivalent to `tag = "v2.9.0"`
-    commit = "8a20d54a3c1bfa38c03ea99a2ad3c1b0a45dfa95",
-    shallow_since = "1652465115 -0700"
+    # Below is reproducible and equivalent to `tag = "v2.11.0"`
+    commit = "d5b57ca93e506df258271ea00fc29cf98383a374",
+    shallow_since = "1668561432 -0800"
 )
 
 # Check bazel version requirement, which is stricter than TensorFlow's.

@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
 
   private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
   private static final int SAMPLE_RATE = 16000;
+  private static final int LYRA_NUM_RANDOM_FEATURE_VECTORS = 10000;
   private static final String[] permissions = {Manifest.permission.RECORD_AUDIO};
 
   private boolean hasStartedDecode = false;
@@ -252,7 +253,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.i(TAG, "Starting lyraBenchmark()");
                 // Example of a call to a C++ lyra method on a background
                 // thread.
-                lyraBenchmark(2000, weightsDirectory);
+                lyraBenchmark(LYRA_NUM_RANDOM_FEATURE_VECTORS, weightsDirectory);
                 Log.i(TAG, "Finished lyraBenchmark()");
                 tv.post(() -> tv.setText(R.string.benchmark_finished));
                 button.post(() -> button.setEnabled(true));
