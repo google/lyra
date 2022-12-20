@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-          bazel build lyra/android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
+          bazelisk build lyra/android_example:lyra_android_example --config=android_arm64 --copt=-DBENCHMARK
       - name: Copy artifacts
         shell: bash
         run: |
