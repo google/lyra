@@ -20,11 +20,17 @@ runs:
     - shell: bash
       run: |
         export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-        bazel build -c opt lyra/cli_example:encoder_main ${{ inputs.build-options }}
+        if [[ "${{inputs.platform}}" != "android" ]]; then
+          bazelisk test -c opt lyra/cli_example:encoder_main_lib_test ${{ inputs.build-options }}
+        fi
+        bazelisk build -c opt lyra/cli_example:encoder_main ${{ inputs.build-options }}
     - shell: bash
       run: |
         export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
-        bazel build -c opt lyra/cli_example:decoder_main ${{ inputs.build-options }}
+        if [[ "${{inputs.platform}}" != "android" ]]; then
+          bazelisk test -c opt lyra/cli_example:decoder_main_lib_test ${{ inputs.build-options }}
+        fi
+        bazelisk build -c opt lyra/cli_example:decoder_main ${{ inputs.build-options }}
     - shell: bash
       run: |
         mkdir action-product

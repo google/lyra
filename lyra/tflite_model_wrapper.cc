@@ -63,9 +63,8 @@ std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
   if (use_xnn) {
     // Enable XXNPack.
     auto options = TfLiteXNNPackDelegateOptionsDefault();
-    if (int8_quantized) {
-      options.flags |= TFLITE_XNNPACK_DELEGATE_FLAG_QS8;
-    }
+    // TODO(b/219786261) Remove once XNNPACK is enabled by default.
+    options.flags |= TFLITE_XNNPACK_DELEGATE_FLAG_QU8;
     options.num_threads = 1;
     auto delegate =
         std::unique_ptr<TfLiteDelegate, std::function<void(TfLiteDelegate*)> >(

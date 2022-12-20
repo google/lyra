@@ -154,15 +154,15 @@ If you press 'Benchmark', you should see something like the following in logcat
 on a Pixel 6 Pro when running the benchmark:
 
 ```shell
-lyra_benchmark:  feature_extractor:  max: 0.575 ms  min: 0.131 ms  mean: 0.139 ms  stdev: 0.004 ms
-lyra_benchmark: quantizer_quantize:  max: 0.304 ms  min: 0.105 ms  mean: 0.109 ms  stdev: 0.002 ms
-lyra_benchmark:   quantizer_decode:  max: 0.103 ms  min: 0.025 ms  mean: 0.026 ms  stdev: 0.000 ms
-lyra_benchmark:       model_decode:  max: 0.462 ms  min: 0.187 ms  mean: 0.197 ms  stdev: 0.001 ms
-lyra_benchmark:              total:  max: 1.160 ms  min: 0.452 ms  mean: 0.473 ms  stdev: 0.009 ms
+lyra_benchmark:  feature_extractor:  max: 1.836 ms  min: 0.132 ms  mean: 0.153 ms  stdev: 0.042 ms
+lyra_benchmark: quantizer_quantize:  max: 1.042 ms  min: 0.120 ms  mean: 0.130 ms  stdev: 0.028 ms
+lyra_benchmark:   quantizer_decode:  max: 0.103 ms  min: 0.026 ms  mean: 0.029 ms  stdev: 0.003 ms
+lyra_benchmark:       model_decode:  max: 0.820 ms  min: 0.191 ms  mean: 0.212 ms  stdev: 0.031 ms
+lyra_benchmark:              total:  max: 2.536 ms  min: 0.471 ms  mean: 0.525 ms  stdev: 0.088 ms
 ```
 
 This shows that decoding a 50Hz frame (each frame is 20 milliseconds) takes
-0.473 milliseconds on average. So decoding is performed at around 42 (20/0.473)
+0.525 milliseconds on average. So decoding is performed at around 38 (20/0.525)
 times faster than realtime.
 
 To build your own android app, you can either use the cc_library target outputs
