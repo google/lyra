@@ -136,10 +136,26 @@ public class MainActivity extends AppCompatActivity {
     if (micDataShortsWritten == 0) {
       return;
     }
-    // Whatever micData holds, encode and decode with Lyra.
-    short[] decodedAudio = encodeAndDecodeSamples(micData, micDataShortsWritten, bitrate,
+    // Encode the recorded wave inside the micData with Lyra
+    short[] encodedAudio = encodeSamples(micData, micDataShortsWritten, SAMPLE_RATE, bitrate,
         weightsDirectory);
 
+    // Notes for Chase: 
+    // The bytes in "encodedAudio" array contains all the data you wish to transmit via our LoRa network.
+    // The length of the short array "encodedAudio" is typically larger than the maximum payload
+    // size allowed by our LoRa protocol, so make sure you manually separate this array into several
+    // small packets (e.g. ~100 bytes long) and transmit them via LoRa network sequentially. 
+    // 
+    // Another thing to note is that the Lyra codec can tolarate packet losses up to some level. Therefore, it 
+    // might be useful to try different sizes of the small packets to find which size(s) give you the best audio
+    // experience when packet loss is present.
+    // 
+    // At the receiving side, when you receive a packet, you can call "decodeSample" function to decode a Lyra packet.
+    // The decoded audio should be buffered into an array first and then play the buffered audio (see the example below).
+    // In practice, do not assume that the receiving party will receive 100% of the transmitted packets. Therefore, just
+    // decode what you receive - the interrupting audio may still be useful to the end users.
+    short[] decodedAudio = decodeSamples(encodedAudio, micDataShortsWritten, SAMPLE_RATE,
+                                         bitrate, weightsDirectory);
     if (decodedAudio == null) {
       Log.e(TAG, "Failed to encode and decode microphone data.");
       return;
@@ -289,11 +305,16 @@ public class MainActivity extends AppCompatActivity {
   }
 
   /**
-   * A method that is implemented by the 'lyra_android_example' C++ library, which is packaged with
+   * Methods that are implemented by the 'lyra_android_example' C++ library, which is packaged with
    * this application.
    */
   public native String lyraBenchmark(int numCondVectors, String modelBasePath);
 
-  public native short[] encodeAndDecodeSamples(
-      short[] samples, int sampleLength, int bitrate, String modelBasePath);
+  public native short[] encodeSamples(
+    short[] samples, int sampleLength, int sample_rate_Hz, 
+    int bitrate, String modelBasePath);
+
+  public native short[] decodeSamples(
+    short[] samples, int sampleLength, int sample_rate_Hz, 
+    int bitrate, String modelBasePath);
 }
