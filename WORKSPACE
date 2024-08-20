@@ -97,7 +97,7 @@ git_repository(
 )
 # Dependency for glog
 git_repository(
-    name = "com_github_gflags_gflags",
+    name = "gflags",
     remote = "https://github.com/mchinen/gflags.git",
     branch = "android_linking_fix"
 )
