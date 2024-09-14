@@ -34,7 +34,7 @@ class LyraGanModel : public GenerativeModel {
  public:
   // Returns a nullptr on failure.
   static std::unique_ptr<LyraGanModel> Create(
-      const ghc::filesystem::path& model_path, int num_features);
+      const LyraModels& models, int num_features);
 
   ~LyraGanModel() override {}
 

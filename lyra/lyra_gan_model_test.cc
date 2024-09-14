@@ -26,6 +26,8 @@
 #include "include/ghc/filesystem.hpp"
 #include "lyra/lyra_config.h"
 
+#include "model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
@@ -34,7 +36,7 @@ class LyraGanModelTest : public testing::Test {
  protected:
   LyraGanModelTest()
       : model_(LyraGanModel::Create(
-            ghc::filesystem::current_path() / "lyra/model_coeffs",
+            GetEmbeddedLyraModels(),
             kNumFeatures)),
         features_(kNumFeatures) {}
 
@@ -49,7 +51,7 @@ class LyraGanModelTest : public testing::Test {
 };
 
 TEST_F(LyraGanModelTest, CreationFailsWithInvalidModelPath) {
-  EXPECT_EQ(LyraGanModel::Create("invalid/model/path", features_.size()),
+  EXPECT_EQ(LyraGanModel::Create(GetInvalidEmbeddedLyraModels(), features_.size()),
             nullptr);
 }
 

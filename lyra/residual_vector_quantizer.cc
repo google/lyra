@@ -34,9 +34,9 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<ResidualVectorQuantizer> ResidualVectorQuantizer::Create(
-    const ghc::filesystem::path& model_path) {
+    const LyraModels& models) {
   auto quantizer_model =
-      TfLiteModelWrapper::Create(model_path / "quantizer.tflite",
+      TfLiteModelWrapper::Create(models.quantizer,
                                  /*use_xnn=*/false, /*int8_quantized=*/false);
   if (quantizer_model == nullptr) {
     LOG(ERROR) << "Unable to create the quantizer TfLite model wrapper.";

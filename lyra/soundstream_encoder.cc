@@ -34,9 +34,9 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<SoundStreamEncoder> SoundStreamEncoder::Create(
-    const ghc::filesystem::path& model_path) {
+    const LyraModels& models) {
   auto model =
-      TfLiteModelWrapper::Create(model_path / "soundstream_encoder.tflite",
+      TfLiteModelWrapper::Create(models.soundstream_encoder,
                                  /*use_xnn=*/true, /*int8_quantized=*/true);
   if (model == nullptr) {
     LOG(ERROR) << "Unable to create SoundStream encoder TFLite model wrapper.";

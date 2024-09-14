@@ -42,9 +42,9 @@ namespace codec {
 
 std::unique_ptr<LyraEncoder> LyraEncoder::Create(
     int sample_rate_hz, int num_channels, int bitrate, bool enable_dtx,
-    const ghc::filesystem::path& model_path) {
+    const LyraModels& models) {
   absl::Status are_params_supported =
-      AreParamsSupported(sample_rate_hz, num_channels, model_path);
+      AreParamsSupported(sample_rate_hz, num_channels, models);
   if (!are_params_supported.ok()) {
     LOG(ERROR) << are_params_supported;
     return nullptr;
@@ -64,13 +64,13 @@ std::unique_ptr<LyraEncoder> LyraEncoder::Create(
     }
   }
 
-  auto feature_extractor = CreateFeatureExtractor(model_path);
+  auto feature_extractor = CreateFeatureExtractor(models);
   if (feature_extractor == nullptr) {
     LOG(ERROR) << "Could not create Features Extractor.";
     return nullptr;
   }
 
-  auto vector_quantizer = CreateQuantizer(model_path);
+  auto vector_quantizer = CreateQuantizer(models);
   if (vector_quantizer == nullptr) {
     LOG(ERROR) << "Could not create Vector Quantizer.";
     return nullptr;

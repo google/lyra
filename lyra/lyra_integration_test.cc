@@ -34,6 +34,8 @@
 #include "lyra/lyra_encoder.h"
 #include "lyra/wav_utils.h"
 
+#include "model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
@@ -48,8 +50,7 @@ class LyraIntegrationTest
 // This tests that decoded audio has similar features as the original.
 TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
   const ghc::filesystem::path wav_dir("lyra/testdata");
-  const auto model_path =
-      ghc::filesystem::current_path() / std::string("lyra/model_coeffs");
+  const LyraModels models = GetEmbeddedLyraModels();
 
   const auto input_path = ghc::filesystem::current_path() / wav_dir /
                           std::string(std::get<0>(GetParam()));
@@ -62,11 +63,11 @@ TEST_P(LyraIntegrationTest, DecodedAudioHasSimilarFeatures) {
   std::unique_ptr<LyraEncoder> encoder =
       LyraEncoder::Create(sample_rate_hz, input_wav_result->num_channels,
                           GetBitrate(num_quantized_bits),
-                          /*enable_dtx=*/false, model_path);
+                          /*enable_dtx=*/false, models);
   ASSERT_NE(encoder, nullptr);
 
   std::unique_ptr<LyraDecoder> decoder = LyraDecoder::Create(
-      sample_rate_hz, input_wav_result->num_channels, model_path);
+      sample_rate_hz, input_wav_result->num_channels, models);
   ASSERT_NE(decoder, nullptr);
 
   // Keep only 3 seconds to shorten the test duration.

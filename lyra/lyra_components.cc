@@ -40,18 +40,18 @@ constexpr int kMaxNumPacketBits = 184;
 }  // namespace
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    const ghc::filesystem::path& model_path) {
-  return ResidualVectorQuantizer::Create(model_path);
+    const LyraModels& models) {
+  return ResidualVectorQuantizer::Create(models);
 }
 
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
-    int num_output_features, const ghc::filesystem::path& model_path) {
-  return LyraGanModel::Create(model_path, num_output_features);
+    int num_output_features, const LyraModels& models) {
+  return LyraGanModel::Create(models, num_output_features);
 }
 
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(
-    const ghc::filesystem::path& model_path) {
-  return SoundStreamEncoder::Create(model_path);
+    const LyraModels& models) {
+  return SoundStreamEncoder::Create(models);
 }
 
 std::unique_ptr<PacketInterface> CreatePacket(int num_header_bits,

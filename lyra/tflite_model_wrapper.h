@@ -25,6 +25,7 @@
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/model_builder.h"
 #include "tensorflow/lite/signature_runner.h"
+#include "lyra_embedded_models.h"
 
 namespace chromemedia {
 namespace codec {
@@ -32,7 +33,7 @@ namespace codec {
 class TfLiteModelWrapper {
  public:
   static std::unique_ptr<TfLiteModelWrapper> Create(
-      const ghc::filesystem::path& model_file, bool use_xnn,
+      const LyraModel& model_file, bool use_xnn,
       bool int8_quantized);
 
   bool Invoke();

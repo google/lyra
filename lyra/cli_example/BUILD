@@ -117,7 +117,6 @@ cc_binary(
     }),
     deps = [
         ":encoder_main_lib",
-        "//lyra:architecture_utils",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/flags:usage",
@@ -139,7 +138,6 @@ cc_binary(
     }),
     deps = [
         ":decoder_main_lib",
-        "//lyra:architecture_utils",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/flags:usage",

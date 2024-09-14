@@ -146,8 +146,8 @@ bool DecodeFile(const ghc::filesystem::path& encoded_path,
                 int bitrate, bool randomize_num_samples_requested,
                 float packet_loss_rate, float average_burst_length,
                 const PacketLossPattern& fixed_packet_loss_pattern,
-                const ghc::filesystem::path& model_path) {
-  auto decoder = LyraDecoder::Create(sample_rate_hz, kNumChannels, model_path);
+                const LyraModels& models) {
+  auto decoder = LyraDecoder::Create(sample_rate_hz, kNumChannels, models);
   if (decoder == nullptr) {
     LOG(ERROR) << "Could not create lyra decoder.";
     return false;

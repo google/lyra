@@ -1,1 +1,3 @@
 *~
+/bazel-*
+/lyra/model_coeffs/_models.h

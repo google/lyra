@@ -44,6 +44,8 @@
 #include "lyra/testing/mock_vector_quantizer.h"
 #include "lyra/vector_quantizer_interface.h"
 
+#include "lyra/model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 
@@ -95,7 +97,7 @@ namespace {
 using testing::Exactly;
 using testing::Return;
 
-static constexpr absl::string_view kExportedModelPath = "lyra/model_coeffs";
+static chromemedia::codec::LyraModels kExportedModels = GetEmbeddedLyraModels();
 
 // Duration of pure packet loss concealment.
 inline int GetConcealmentDurationSamples() {
@@ -142,7 +144,7 @@ class LyraDecoderTest
         quantized_zeros_(num_quantized_bits_, '0'),
         packet_(CreatePacket(kNumHeaderBits, num_quantized_bits_)),
         encoded_zeros_(packet_->PackQuantized(quantized_zeros_)),
-        model_path_(ghc::filesystem::current_path() / kExportedModelPath),
+        models_(GetEmbeddedLyraModels()),
         mock_features_(kNumFeatures),
         mock_noise_features_(kNumMelBins),
         mock_samples_(internal_num_samples_per_hop_),
@@ -359,7 +361,7 @@ class LyraDecoderTest
   const std::string quantized_zeros_;
   const std::unique_ptr<PacketInterface> packet_;
   const std::vector<uint8_t> encoded_zeros_;
-  const ghc::filesystem::path model_path_;
+  const LyraModels models_;
   std::vector<float> mock_features_;
   std::vector<float> mock_noise_features_;
   std::optional<std::vector<int16_t>> mock_samples_;
@@ -782,14 +784,14 @@ TEST_P(LyraDecoderTest, ArbitraryNumSamplesFadeFromComfortNoise) {
 
 TEST_P(LyraDecoderTest, ValidConfig) {
   EXPECT_NE(
-      LyraDecoder::Create(external_sample_rate_hz_, kNumChannels, model_path_),
+      LyraDecoder::Create(external_sample_rate_hz_, kNumChannels, models_),
       nullptr);
 }
 
 TEST_P(LyraDecoderTest, InvalidConfig) {
   for (const auto& invalid_num_channels : {-1, 0, 2}) {
     EXPECT_EQ(LyraDecoder::Create(external_sample_rate_hz_,
-                                  invalid_num_channels, model_path_),
+                                  invalid_num_channels, models_),
               nullptr);
   }
 }
@@ -802,12 +804,12 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(LyraDecoderCreate, InvalidCreateReturnsNullptr) {
   for (const auto& invalid_sample_rate : {0, -1, 16001}) {
     EXPECT_EQ(LyraDecoder::Create(invalid_sample_rate, kNumChannels,
-                                  kExportedModelPath),
+                                  kExportedModels),
               nullptr);
   }
   for (const auto& valid_sample_rate : kSupportedSampleRates) {
     EXPECT_EQ(
-        LyraDecoder::Create(valid_sample_rate, kNumChannels, "/does/not/exist"),
+        LyraDecoder::Create(valid_sample_rate, kNumChannels, GetInvalidEmbeddedLyraModels()),
         nullptr);
   }
 }

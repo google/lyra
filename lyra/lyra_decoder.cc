@@ -94,9 +94,9 @@ int GetNumSamplesToGenerate(int num_samples_requested,
 
 std::unique_ptr<LyraDecoder> LyraDecoder::Create(
     int sample_rate_hz, int num_channels,
-    const ghc::filesystem::path& model_path) {
+    const LyraModels& models) {
   absl::Status are_params_supported =
-      AreParamsSupported(sample_rate_hz, num_channels, model_path);
+      AreParamsSupported(sample_rate_hz, num_channels, models);
   if (!are_params_supported.ok()) {
     LOG(ERROR) << are_params_supported;
     return nullptr;
@@ -114,7 +114,7 @@ std::unique_ptr<LyraDecoder> LyraDecoder::Create(
     return nullptr;
   }
   // All internal components operate at |kInternalSampleRateHz|.
-  auto model = CreateGenerativeModel(kNumFeatures, model_path);
+  auto model = CreateGenerativeModel(kNumFeatures, models);
   if (model == nullptr) {
     LOG(ERROR) << "New model could not be instantiated.";
     return nullptr;
@@ -133,7 +133,7 @@ std::unique_ptr<LyraDecoder> LyraDecoder::Create(
     LOG(ERROR) << "Could not create Noise Estimator.";
     return nullptr;
   }
-  auto vector_quantizer = CreateQuantizer(model_path);
+  auto vector_quantizer = CreateQuantizer(models);
   if (vector_quantizer == nullptr) {
     LOG(ERROR) << "Could not create Vector Quantizer.";
     return nullptr;

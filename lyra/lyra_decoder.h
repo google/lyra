@@ -30,6 +30,7 @@
 #include "lyra/lyra_decoder_interface.h"
 #include "lyra/noise_estimator_interface.h"
 #include "lyra/vector_quantizer_interface.h"
+#include "lyra/lyra_embedded_models.h"
 
 namespace chromemedia {
 namespace codec {
@@ -46,14 +47,14 @@ class LyraDecoder : public LyraDecoderInterface {
   ///                       rates are 8000, 16000, 32000 and 48000.
   /// @param num_channels Desired number of channels. Currently only 1 is
   ///                     supported.
-  /// @param model_path Path to the model weights. The identifier in the
+  /// @param models Path to the model weights. The identifier in the
   ///                   lyra_config.binarypb has to coincide with the
   ///                   |kVersionMinor| constant in lyra_config.cc.
   /// @return A unique_ptr to a |LyraDecoder| if all desired params are
   ///         supported. Else it returns a nullptr.
   static std::unique_ptr<LyraDecoder> Create(
       int sample_rate_hz, int num_channels,
-      const ghc::filesystem::path& model_path);
+      const LyraModels& models);
 
   /// Parses a packet and prepares to decode samples from the payload.
   ///

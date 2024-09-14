@@ -33,6 +33,7 @@
 #include "glog/logging.h"  // IWYU pragma: keep
 #include "include/ghc/filesystem.hpp"
 #include "lyra/lyra_config.pb.h"
+#include "lyra/lyra_embedded_models.h"
 
 namespace chromemedia {
 namespace codec {
@@ -118,7 +119,7 @@ std::vector<absl::string_view> GetAssets();
 
 inline absl::Status AreParamsSupported(
     int sample_rate_hz, int num_channels,
-    const ghc::filesystem::path& model_path) {
+    const LyraModels& models) {
   if (!IsSampleRateSupported(sample_rate_hz)) {
     return absl::InvalidArgumentError(absl::StrFormat(
         "Sample rate %d Hz is not supported by codec.", sample_rate_hz));
@@ -128,36 +129,9 @@ inline absl::Status AreParamsSupported(
         "Number of channels %d is not supported by codec. It needs to be %d.",
         num_channels, kNumChannels));
   }
-  for (auto asset : GetAssets()) {
-    std::error_code error;
-    const bool exists =
-        ghc::filesystem::exists(model_path / std::string(asset), error);
-    if (error) {
-      return absl::UnknownError(
-          absl::StrFormat("Error when probing for asset %s in %s: %s", asset,
-                          model_path, error.message()));
-    }
-    if (!exists) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("Asset %s does not exist in %s.", asset, model_path));
-    }
-  }
-  const ghc::filesystem::path lyra_config_proto_path =
-      model_path / "lyra_config.binarypb";
-  std::error_code error;
-  const bool exists = ghc::filesystem::exists(lyra_config_proto_path, error);
-  if (error) {
-    return absl::UnknownError(
-        absl::StrFormat("Error when probing for asset %s: %s",
-                        lyra_config_proto_path.string(), error.message()));
-  }
   third_party::lyra_codec::lyra::LyraConfig lyra_config;
-  if (exists) {
-    std::ifstream lyra_config_stream(lyra_config_proto_path.string());
-    if (!lyra_config.ParseFromIstream(&lyra_config_stream)) {
-      return absl::UnknownError(absl::StrFormat(
-          "Error when parsing %s", lyra_config_proto_path.string()));
-    }
+  if (!lyra_config.ParseFromArray(models.lyra_config_proto.buffer, static_cast<int>(models.lyra_config_proto.size))) {
+    return absl::UnknownError("Error when parsing lyra config proto");
   }
   if (lyra_config.identifier() != kVersionMinor) {
     return absl::InvalidArgumentError(absl::StrFormat(

@@ -42,13 +42,13 @@ namespace codec {
 // starting at index 0.
 bool EncodeWav(const std::vector<int16_t>& wav_data, int num_channels,
                int sample_rate_hz, int bitrate, bool enable_preprocessing,
-               bool enable_dtx, const ghc::filesystem::path& model_path,
+               bool enable_dtx, const chromemedia::codec::LyraModels& models,
                std::vector<uint8_t>* encoded_features) {
   auto encoder = LyraEncoder::Create(/*sample_rate_hz=*/sample_rate_hz,
                                      /*num_channels=*/num_channels,
                                      /*bitrate=*/bitrate,
                                      /*enable_dtx=*/enable_dtx,
-                                     /*model_path=*/model_path);
+                                     /*models=*/models);
   if (encoder == nullptr) {
     LOG(ERROR) << "Could not create lyra encoder.";
     return false;
@@ -98,7 +98,7 @@ bool EncodeWav(const std::vector<int16_t>& wav_data, int num_channels,
 bool EncodeFile(const ghc::filesystem::path& wav_path,
                 const ghc::filesystem::path& output_path, int bitrate,
                 bool enable_preprocessing, bool enable_dtx,
-                const ghc::filesystem::path& model_path) {
+                const chromemedia::codec::LyraModels& models) {
   // Reads the entire wav file into memory.
   absl::StatusOr<ReadWavResult> read_wav_result =
       Read16BitWavFileToVector(wav_path.string());
@@ -112,7 +112,7 @@ bool EncodeFile(const ghc::filesystem::path& wav_path,
   std::vector<uint8_t> encoded_features;
   if (!EncodeWav(read_wav_result->samples, read_wav_result->num_channels,
                  read_wav_result->sample_rate_hz, bitrate, enable_preprocessing,
-                 enable_dtx, model_path, &encoded_features)) {
+                 enable_dtx, models, &encoded_features)) {
     LOG(ERROR) << "Unable to encode features for file " << wav_path;
     return false;
   }

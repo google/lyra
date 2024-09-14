@@ -22,8 +22,9 @@
 #include "absl/strings/string_view.h"
 #include "glog/logging.h"  // IWYU pragma: keep
 #include "include/ghc/filesystem.hpp"
-#include "lyra/architecture_utils.h"
 #include "lyra/cli_example/decoder_main_lib.h"
+
+#include "lyra/model_coeffs/_models.h"
 
 ABSL_FLAG(std::string, encoded_path, "",
           "Complete path to the file containing the encoded features.");
@@ -50,11 +51,6 @@ ABSL_FLAG(chromemedia::codec::PacketLossPattern, fixed_packet_loss_pattern,
           "bursts will be rounded up to the nearest packet duration boundary. "
           "If this flag contains a nonzero number of values we ignore "
           "|packet_loss_rate| and |average_burst_length|.");
-ABSL_FLAG(std::string, model_path, "lyra/model_coeffs",
-          "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like "
-          "'/data/local/tmp/lyra/model_coeffs/'."
-          " For desktop this is the path relative to the binary.");
 
 int main(int argc, char** argv) {
   absl::SetProgramUsageMessage(argv[0]);
@@ -71,9 +67,7 @@ int main(int argc, char** argv) {
   const float average_burst_length = absl::GetFlag(FLAGS_average_burst_length);
   const chromemedia::codec::PacketLossPattern fixed_packet_loss_pattern =
       absl::GetFlag(FLAGS_fixed_packet_loss_pattern);
-  const ghc::filesystem::path model_path =
-      chromemedia::codec::GetCompleteArchitecturePath(
-          absl::GetFlag(FLAGS_model_path));
+  const chromemedia::codec::LyraModels models = GetEmbeddedLyraModels();
   if (!fixed_packet_loss_pattern.starts_.empty()) {
     LOG(INFO) << "Using fixed packet loss pattern instead of gilbert model.";
   }
@@ -102,7 +96,7 @@ int main(int argc, char** argv) {
   if (!chromemedia::codec::DecodeFile(encoded_path, output_path, sample_rate_hz,
                                       bitrate, randomize_num_samples_requested,
                                       packet_loss_rate, average_burst_length,
-                                      fixed_packet_loss_pattern, model_path)) {
+                                      fixed_packet_loss_pattern, models)) {
     LOG(ERROR) << "Could not decode " << encoded_path;
     return -1;
   }

@@ -25,18 +25,19 @@
 #include "lyra/generative_model_interface.h"
 #include "lyra/packet_interface.h"
 #include "lyra/vector_quantizer_interface.h"
+#include "lyra/lyra_embedded_models.h"
 
 namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<VectorQuantizerInterface> CreateQuantizer(
-    const ghc::filesystem::path& model_path);
+    const LyraModels& models);
 
 std::unique_ptr<GenerativeModelInterface> CreateGenerativeModel(
-    int num_output_features, const ghc::filesystem::path& model_path);
+    int num_output_features, const LyraModels& models);
 
 std::unique_ptr<FeatureExtractorInterface> CreateFeatureExtractor(
-    const ghc::filesystem::path& model_path);
+    const LyraModels& models);
 
 std::unique_ptr<PacketInterface> CreatePacket(int num_header_bits,
                                               int num_quantized_bits);

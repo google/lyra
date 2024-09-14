@@ -27,6 +27,8 @@
 #include "include/ghc/filesystem.hpp"
 #include "lyra/lyra_config.h"
 
+#include "model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
@@ -34,14 +36,13 @@ namespace {
 class SoundStreamEncoderTest : public testing::Test {
  protected:
   SoundStreamEncoderTest()
-      : encoder_(SoundStreamEncoder::Create(ghc::filesystem::current_path() /
-                                            "lyra/model_coeffs")) {}
+      : encoder_(SoundStreamEncoder::Create(GetEmbeddedLyraModels())) {}
 
   std::unique_ptr<SoundStreamEncoder> encoder_;
 };
 
 TEST_F(SoundStreamEncoderTest, CreationFailsWithInvalidModelPath) {
-  EXPECT_EQ(SoundStreamEncoder::Create("invalid/model/path"), nullptr);
+  EXPECT_EQ(SoundStreamEncoder::Create(GetInvalidEmbeddedLyraModels()), nullptr);
 }
 
 TEST_F(SoundStreamEncoderTest, CreationSucceedsWithValidModelPath) {

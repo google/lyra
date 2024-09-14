@@ -34,9 +34,9 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<LyraGanModel> LyraGanModel::Create(
-    const ghc::filesystem::path& model_path, int num_features) {
+    const LyraModels& models, int num_features) {
   auto model =
-      TfLiteModelWrapper::Create(model_path / "lyragan.tflite",
+      TfLiteModelWrapper::Create(models.lyragan,
                                  /*use_xnn=*/true, /*int8_quantized=*/true);
   if (model == nullptr) {
     LOG(ERROR) << "Unable to create LyraGAN TFLite model wrapper.";

@@ -55,7 +55,6 @@ bool DecodeFeatures(const std::vector<uint8_t>& packet_stream, int packet_size,
                     std::vector<int16_t>* decoded_audio);
 
 // Decodes an encoded features file into a wav file.
-// Uses the model and quant files located under |model_path|.
 // Given the file /tmp/lyra/file1.lyra exists and is a valid encoded file. For:
 // |encoded_path| = "/tmp/lyra/file1.lyra"
 // |output_path| = "/tmp/lyra/file1_decoded.lyra"
@@ -66,7 +65,7 @@ bool DecodeFile(const ghc::filesystem::path& encoded_path,
                 int bitrate, bool randomize_num_samples_requested,
                 float packet_loss_rate, float average_burst_length,
                 const PacketLossPattern& fixed_packet_loss_pattern,
-                const ghc::filesystem::path& model_path);
+                const chromemedia::codec::LyraModels& models);
 
 }  // namespace codec
 }  // namespace chromemedia

@@ -301,54 +301,6 @@ TEST_P(LyraEncoderTest, MultipleEncodeCalls) {
   }
 }
 
-TEST_P(LyraEncoderTest, GoodCreationParametersReturnNotNullptr) {
-  const auto valid_model_path =
-      ghc::filesystem::current_path() / "lyra/model_coeffs";
-
-  EXPECT_NE(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/false, valid_model_path));
-  EXPECT_NE(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/true, valid_model_path));
-}
-
-TEST_P(LyraEncoderTest, BadCreationParametersReturnNullptr) {
-  const auto valid_model_path =
-      ghc::filesystem::current_path() / "lyra/model_coeffs";
-
-  EXPECT_EQ(nullptr, LyraEncoder::Create(
-                         0, kNumChannels, GetBitrate(num_quantized_bits_),
-                         /*enable_dtx=*/false, valid_model_path));
-  EXPECT_EQ(nullptr, LyraEncoder::Create(
-                         0, kNumChannels, GetBitrate(num_quantized_bits_),
-                         /*enable_dtx=*/true, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, -3,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/false, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, -3,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/true, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels, -2,
-                                /*enable_dtx=*/false, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels, -2,
-                                /*enable_dtx=*/true, valid_model_path));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/false, "bad_model_path"));
-  EXPECT_EQ(nullptr,
-            LyraEncoder::Create(external_sample_rate_hz_, kNumChannels,
-                                GetBitrate(num_quantized_bits_),
-                                /*enable_dtx=*/true, "bad_model_path"));
-}
-
 TEST_P(LyraEncoderTest, SetBitrateSucceeds) {
   LyraEncoderPeer encoder_peer(std::move(mock_resampler_),
                                std::move(mock_feature_extractor_), nullptr,

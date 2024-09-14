@@ -25,12 +25,6 @@ ABSL_FLAG(int, num_cond_vectors, 2000,
           "stack / network. "
           "Equivalent to the number of calls to Precompute and Run.");
 
-ABSL_FLAG(std::string, model_path, "lyra/model_coeffs",
-          "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like "
-          "'/data/local/tmp/lyra/model_coeffs/'."
-          " For desktop this is the path relative to the binary.");
-
 ABSL_FLAG(bool, benchmark_feature_extraction, true,
           "Whether to benchmark the feature extraction.");
 
@@ -45,7 +39,7 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
   return chromemedia::codec::lyra_benchmark(
-      absl::GetFlag(FLAGS_num_cond_vectors), absl::GetFlag(FLAGS_model_path),
+      absl::GetFlag(FLAGS_num_cond_vectors),
       absl::GetFlag(FLAGS_benchmark_feature_extraction),
       absl::GetFlag(FLAGS_benchmark_quantizer),
       absl::GetFlag(FLAGS_benchmark_generative_model));

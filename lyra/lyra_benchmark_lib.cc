@@ -39,12 +39,13 @@
 #include "audio/dsp/signal_vector_util.h"
 #include "glog/logging.h"  // IWYU pragma: keep
 #include "include/ghc/filesystem.hpp"
-#include "lyra/architecture_utils.h"
 #include "lyra/dsp_utils.h"
 #include "lyra/feature_extractor_interface.h"
 #include "lyra/generative_model_interface.h"
 #include "lyra/lyra_components.h"
 #include "lyra/lyra_config.h"
+
+#include "model_coeffs/_models.h"
 
 #ifdef BENCHMARK
 #include "absl/base/thread_annotations.h"
@@ -197,7 +198,6 @@ void PrintStatsAndWriteCSV(const std::vector<int64_t>& timings,
 }
 
 int lyra_benchmark(const int num_cond_vectors,
-                   const std::string& model_base_path,
                    const bool benchmark_feature_extraction,
                    const bool benchmark_quantizer,
                    const bool benchmark_generative_model) {
@@ -207,18 +207,18 @@ int lyra_benchmark(const int num_cond_vectors,
   }
 
   const int num_samples_per_hop = GetNumSamplesPerHop(kInternalSampleRateHz);
-  const std::string model_path = GetCompleteArchitecturePath(model_base_path);
+  const auto models = GetEmbeddedLyraModels();
 
   std::unique_ptr<FeatureExtractorInterface> feature_extractor =
-      benchmark_feature_extraction ? CreateFeatureExtractor(model_path)
+      benchmark_feature_extraction ? CreateFeatureExtractor(models)
                                    : nullptr;
 
   std::unique_ptr<VectorQuantizerInterface> vector_quantizer =
-      benchmark_quantizer ? CreateQuantizer(model_path) : nullptr;
+      benchmark_quantizer ? CreateQuantizer(models) : nullptr;
 
   std::unique_ptr<GenerativeModelInterface> model =
       benchmark_generative_model
-          ? CreateGenerativeModel(kNumFeatures, model_path)
+          ? CreateGenerativeModel(kNumFeatures, models)
           : nullptr;
 
   std::vector<int64_t> feature_extractor_timings;

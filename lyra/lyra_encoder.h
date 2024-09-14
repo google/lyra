@@ -29,6 +29,7 @@
 #include "lyra/noise_estimator_interface.h"
 #include "lyra/resampler_interface.h"
 #include "lyra/vector_quantizer_interface.h"
+#include "lyra/lyra_embedded_models.h"
 
 namespace chromemedia {
 namespace codec {
@@ -53,14 +54,12 @@ class LyraEncoder : public LyraEncoderInterface {
   ///                 and 9200.
   /// @param enable_dtx Set to true if discontinuous transmission should be
   ///                   enabled.
-  /// @param model_path Path to the model weights. The identifier in the
-  ///                   lyra_config.textproto has to coincide with the
-  ///                   kVersionMinor constant in lyra_config.cc.
+  /// @param models
   /// @return A unique_ptr to a LyraEncoder if all desired params are supported.
   ///         Else it returns a nullptr.
   static std::unique_ptr<LyraEncoder> Create(
       int sample_rate_hz, int num_channels, int bitrate, bool enable_dtx,
-      const ghc::filesystem::path& model_path);
+      const LyraModels& models);
 
   /// Encodes the audio samples into a vector wrapped byte array.
   ///

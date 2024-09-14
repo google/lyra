@@ -33,17 +33,10 @@ config_setting(
 )
 
 cc_library(
-    name = "architecture_utils",
-    hdrs = ["architecture_utils.h"],
-    deps = ["@gulrak_filesystem//:filesystem"],
-)
-
-cc_library(
     name = "lyra_benchmark_lib",
     srcs = ["lyra_benchmark_lib.cc"],
     hdrs = ["lyra_benchmark_lib.h"],
     deps = [
-        ":architecture_utils",
         ":dsp_utils",
         ":feature_extractor_interface",
         ":generative_model_interface",
@@ -771,6 +764,7 @@ cc_library(
     ],
     hdrs = [
         "tflite_model_wrapper.h",
+        "lyra_embedded_models.h",
     ],
     deps = [
         "@com_google_absl//absl/memory",
@@ -814,7 +808,10 @@ cc_test(
 
 cc_test(
     name = "tflite_model_wrapper_test",
-    srcs = ["tflite_model_wrapper_test.cc"],
+    srcs = [
+        "tflite_model_wrapper_test.cc",
+        "model_coeffs/_models.h",
+    ],
     data = ["model_coeffs/lyragan.tflite"],
     deps = [
         ":tflite_model_wrapper",

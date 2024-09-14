@@ -21,8 +21,9 @@
 #include "absl/strings/string_view.h"
 #include "glog/logging.h"  // IWYU pragma: keep
 #include "include/ghc/filesystem.hpp"
-#include "lyra/architecture_utils.h"
 #include "lyra/cli_example/encoder_main_lib.h"
+
+#include "lyra/model_coeffs/_models.h"
 
 ABSL_FLAG(std::string, input_path, "",
           "Complete path to the WAV file to be encoded.");
@@ -40,11 +41,6 @@ ABSL_FLAG(bool, enable_preprocessing, false,
 ABSL_FLAG(bool, enable_dtx, false,
           "Enables discontinuous transmission (DTX). DTX does not send packets "
           "when noise is detected.");
-ABSL_FLAG(std::string, model_path, "lyra/model_coeffs",
-          "Path to directory containing TFLite files. For mobile this is the "
-          "absolute path, like "
-          "'/data/local/tmp/lyra/model_coeffs/'."
-          " For desktop this is the path relative to the binary.");
 
 int main(int argc, char** argv) {
   absl::SetProgramUsageMessage(argv[0]);
@@ -52,12 +48,10 @@ int main(int argc, char** argv) {
 
   const ghc::filesystem::path input_path(absl::GetFlag(FLAGS_input_path));
   const ghc::filesystem::path output_dir(absl::GetFlag(FLAGS_output_dir));
-  const ghc::filesystem::path model_path =
-      chromemedia::codec::GetCompleteArchitecturePath(
-          absl::GetFlag(FLAGS_model_path));
   const int bitrate = absl::GetFlag(FLAGS_bitrate);
   const bool enable_preprocessing = absl::GetFlag(FLAGS_enable_preprocessing);
   const bool enable_dtx = absl::GetFlag(FLAGS_enable_dtx);
+  const chromemedia::codec::LyraModels models = GetEmbeddedLyraModels();
 
   if (input_path.empty()) {
     LOG(ERROR) << "Flag --input_path not set.";
@@ -82,7 +76,7 @@ int main(int argc, char** argv) {
 
   if (!chromemedia::codec::EncodeFile(input_path, output_path, bitrate,
                                       enable_preprocessing, enable_dtx,
-                                      model_path)) {
+                                      models)) {
     LOG(ERROR) << "Failed to encode " << input_path;
     return -1;
   }

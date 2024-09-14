@@ -40,7 +40,7 @@ class DecoderMainLibTest : public testing::TestWithParam<int> {
   DecoderMainLibTest()
       : output_dir_(ghc::filesystem::path(testing::TempDir()) / "output/"),
         testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
-        model_path_(ghc::filesystem::current_path() / kExportedModelPath),
+        models_(GetEmbeddedLyraModels()),
         sample_rate_hz_(GetParam()),
         num_samples_in_packet_(GetNumSamplesPerHop(sample_rate_hz_)) {}
 
@@ -67,7 +67,7 @@ class DecoderMainLibTest : public testing::TestWithParam<int> {
 
   const ghc::filesystem::path output_dir_;
   const ghc::filesystem::path testdata_dir_;
-  const ghc::filesystem::path model_path_;
+  const LyraModels models_;
   ghc::filesystem::path input_path_;
   ghc::filesystem::path output_path_;
   const int sample_rate_hz_;
@@ -80,7 +80,7 @@ TEST_P(DecoderMainLibTest, NoEncodedPacket) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/3200, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.f,
-      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), models_));
 }
 
 TEST_P(DecoderMainLibTest, OneEncodedPacket) {
@@ -89,7 +89,7 @@ TEST_P(DecoderMainLibTest, OneEncodedPacket) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.f,
-      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), models_));
 
   EXPECT_EQ(NumSamplesInWavFile(output_path_), num_samples_in_packet_);
 }
@@ -100,7 +100,7 @@ TEST_P(DecoderMainLibTest, RandomizeSampleRequests) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/true,
       /*packet_loss_rate=*/0.f,
-      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), models_));
 
   EXPECT_EQ(NumSamplesInWavFile(output_path_), num_samples_in_packet_);
 }
@@ -111,7 +111,7 @@ TEST_P(DecoderMainLibTest, FileDoesNotExist) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.f,
-      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), models_));
 }
 
 // Tests an encoded features file with less than 1 packet's worth of data.
@@ -122,7 +122,7 @@ TEST_P(DecoderMainLibTest, IncompleteEncodedPacket) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.f,
-      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/1.f, PacketLossPattern({}, {}), models_));
 }
 
 TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithPacketLoss) {
@@ -133,14 +133,14 @@ TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithPacketLoss) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.5f,
-      /*average_burst_length=*/2.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/2.f, PacketLossPattern({}, {}), models_));
   EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 
   EXPECT_TRUE(DecodeFile(
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.9f,
-      /*average_burst_length=*/10.f, PacketLossPattern({}, {}), model_path_));
+      /*average_burst_length=*/10.f, PacketLossPattern({}, {}), models_));
   EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 }
 
@@ -152,7 +152,7 @@ TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithFixedPacketLoss) {
       input_path_, output_path_, sample_rate_hz_,
       /*bitrate=*/6000, /*randomize_num_samples_requested=*/false,
       /*packet_loss_rate=*/0.9f,
-      /*average_burst_length=*/10.f, PacketLossPattern({1}, {0}), model_path_));
+      /*average_burst_length=*/10.f, PacketLossPattern({1}, {0}), models_));
   EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 
   EXPECT_TRUE(DecodeFile(input_path_, output_path_, sample_rate_hz_,
@@ -160,7 +160,7 @@ TEST_P(DecoderMainLibTest, TwoEncodedPacketsWithFixedPacketLoss) {
                          /*randomize_num_samples_requested=*/false,
                          /*packet_loss_rate=*/0.9f,
                          /*average_burst_length=*/10.f,
-                         PacketLossPattern({0}, {100}), model_path_));
+                         PacketLossPattern({0}, {100}), models_));
   EXPECT_EQ(NumSamplesInWavFile(output_path_), expected_num_samples);
 }
 

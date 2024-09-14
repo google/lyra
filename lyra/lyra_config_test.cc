@@ -25,35 +25,20 @@
 #include "include/ghc/filesystem.hpp"
 #include "lyra/lyra_config.pb.h"
 
+#include "lyra/model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
 
 class LyraConfigTest : public testing::Test {
  protected:
-  LyraConfigTest()
-      : source_model_path_(ghc::filesystem::current_path() /
-                           "lyra/model_coeffs") {}
+  LyraConfigTest() : test_models_(GetEmbeddedLyraModels()) {}
 
   void SetUp() override {
     // Create a uniqe sub-directory so tests do not interfere with each other.
     const testing::TestInfo* const test_info =
         testing::UnitTest::GetInstance()->current_test_info();
-    test_model_path_ =
-        ghc::filesystem::path(testing::TempDir()) / test_info->name();
-    ghc::filesystem::create_directory(test_model_path_, error_code_);
-    ASSERT_FALSE(error_code_) << error_code_.message();
-    ghc::filesystem::permissions(
-        test_model_path_, ghc::filesystem::perms::owner_write,
-        ghc::filesystem::perm_options::add, error_code_);
-    ASSERT_FALSE(error_code_) << error_code_.message();
-
-    // Copy model files.
-    ghc::filesystem::copy(source_model_path_, test_model_path_,
-                          ghc::filesystem::copy_options::overwrite_existing |
-                              ghc::filesystem::copy_options::recursive,
-                          error_code_);
-    ASSERT_FALSE(error_code_) << error_code_.message();
   }
 
   void DeleteFile(const ghc::filesystem::path& to_delete) {
@@ -65,14 +50,8 @@ class LyraConfigTest : public testing::Test {
     ASSERT_FALSE(error_code_) << error_code_.message();
   }
 
-  // Folder containing files from |source_model_path_| with some modifications
-  // to simulate various run-time conditions, e.g. missing some files, having
-  // mismatched files.
-  ghc::filesystem::path test_model_path_;
+  LyraModels test_models_;
   std::error_code error_code_;
-
- private:
-  const ghc::filesystem::path source_model_path_;
 };
 
 TEST(LyraConfig, TestGetVersionString) {
@@ -115,44 +94,18 @@ TEST_F(LyraConfigTest, BadBitrateNotSupported) {
 
 TEST_F(LyraConfigTest, GoodParamsSupported) {
   EXPECT_TRUE(
-      AreParamsSupported(kInternalSampleRateHz, kNumChannels, test_model_path_)
+      AreParamsSupported(kInternalSampleRateHz, kNumChannels, test_models_)
           .ok());
 }
 
 TEST_F(LyraConfigTest, BadParamsNotSupported) {
   EXPECT_FALSE(
-      AreParamsSupported(/*sample_rate_hz=*/137, kNumChannels, test_model_path_)
+      AreParamsSupported(/*sample_rate_hz=*/137, kNumChannels, test_models_)
           .ok());
 
   EXPECT_FALSE(AreParamsSupported(kInternalSampleRateHz, /*num_channels=*/-1,
-                                  test_model_path_)
+                                  test_models_)
                    .ok());
-}
-
-TEST_F(LyraConfigTest, MissingAssetNotSupported) {
-  DeleteFile(test_model_path_ / "soundstream_encoder.tflite");
-  EXPECT_FALSE(
-      AreParamsSupported(kInternalSampleRateHz, kNumChannels, test_model_path_)
-          .ok());
-}
-
-TEST_F(LyraConfigTest, MismatchedIdentifierNotSupported) {
-  // Replace the lyra_condfig.binarypb with one that contains an identifier
-  // that does not match |kVersionMinor|.
-  const ghc::filesystem::path lyra_config_proto_path =
-      test_model_path_ / "lyra_config.binarypb";
-  DeleteFile(lyra_config_proto_path);
-  third_party::lyra_codec::lyra::LyraConfig lyra_config_proto;
-  lyra_config_proto.set_identifier(kVersionMinor + 100);
-  std::ofstream output_proto(lyra_config_proto_path.string(),
-                             std::ofstream::out | std::ofstream::binary);
-  ASSERT_TRUE(output_proto.is_open());
-  ASSERT_TRUE(lyra_config_proto.SerializeToOstream(&output_proto));
-  output_proto.close();
-
-  EXPECT_FALSE(
-      AreParamsSupported(kInternalSampleRateHz, kNumChannels, test_model_path_)
-          .ok());
 }
 
 }  // namespace

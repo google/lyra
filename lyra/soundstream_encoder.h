@@ -36,7 +36,7 @@ class SoundStreamEncoder : public FeatureExtractorInterface {
  public:
   // Returns a nullptr on failure.
   static std::unique_ptr<SoundStreamEncoder> Create(
-      const ghc::filesystem::path& model_path);
+      const LyraModels& models);
 
   ~SoundStreamEncoder() override {}
 

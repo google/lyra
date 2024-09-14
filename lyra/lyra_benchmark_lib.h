@@ -31,7 +31,7 @@ struct TimingStats {
   float standard_deviation;
 };
 
-int lyra_benchmark(int num_cond_vectors, const std::string& model_base_path,
+int lyra_benchmark(int num_cond_vectors,
                    bool benchmark_feature_extraction, bool benchmark_quantizer,
                    bool benchmark_generative_model);
 

@@ -25,12 +25,15 @@
 #include "gtest/gtest.h"
 #include "include/ghc/filesystem.hpp"
 
+#include "model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
 
 TEST(TfLiteModelWrapperTest, CreateFailsWithInvalidModelFile) {
-  EXPECT_EQ(TfLiteModelWrapper::Create("invalid/model/path", true, false),
+  const LyraModel invalid = {nullptr, 0};
+  EXPECT_EQ(TfLiteModelWrapper::Create(invalid, true, false),
             nullptr);
 }
 
@@ -38,8 +41,9 @@ class TfLiteModelWrapperTest : public testing::TestWithParam<bool> {};
 
 TEST_P(TfLiteModelWrapperTest, CreateSucceedsAndMethodsRun) {
   const bool int8_quantized = GetParam();
+  const auto lyragan = GetEmbeddedLyraModels().lyragan;
   auto model_wrapper = TfLiteModelWrapper::Create(
-      ghc::filesystem::current_path() / "lyra/model_coeffs/lyragan.tflite",
+      lyragan,
       true, int8_quantized);
   ASSERT_NE(model_wrapper, nullptr);
   absl::Span<float> input = model_wrapper->get_input_tensor<float>(0);

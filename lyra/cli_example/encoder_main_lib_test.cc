@@ -38,7 +38,7 @@ class EncoderMainLibTest : public testing::Test {
   EncoderMainLibTest()
       : output_dir_(ghc::filesystem::path(testing::TempDir()) / "output"),
         testdata_dir_(ghc::filesystem::current_path() / kTestdataDir),
-        model_path_(ghc::filesystem::current_path() / "lyra/model_coeffs") {}
+        models_(GetEmbeddedLyraModels()) {}
 
   void SetUp() override {
     std::error_code error_code;
@@ -54,7 +54,7 @@ class EncoderMainLibTest : public testing::Test {
 
   const ghc::filesystem::path output_dir_;
   const ghc::filesystem::path testdata_dir_;
-  const ghc::filesystem::path model_path_;
+  const LyraModels models_;
 };
 
 TEST_F(EncoderMainLibTest, WavFileNotFound) {
@@ -63,7 +63,7 @@ TEST_F(EncoderMainLibTest, WavFileNotFound) {
 
   EXPECT_FALSE(EncodeFile(kNonExistentWav, kOutputEncoded, /*bitrate=*/3200,
                           /*enable_preprocessing=*/false,
-                          /*enable_dtx=*/false, model_path_));
+                          /*enable_dtx=*/false, models_));
 
   std::error_code error_code;
   EXPECT_FALSE(ghc::filesystem::is_regular_file(kOutputEncoded, error_code));
@@ -75,7 +75,7 @@ TEST_F(EncoderMainLibTest, EncodeSingleWavFiles) {
     const auto kOutputEncoded = (output_dir_ / wav_file).concat(".lyra");
     EXPECT_TRUE(EncodeFile(kInputWavepath, kOutputEncoded, /*bitrate=*/3200,
                            /*enable_preprocessing=*/false,
-                           /*enable_dtx=*/false, model_path_));
+                           /*enable_dtx=*/false, models_));
   }
 }
 

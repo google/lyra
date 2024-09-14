@@ -28,6 +28,8 @@
 #include "lyra/log_mel_spectrogram_extractor_impl.h"
 #include "lyra/lyra_config.h"
 
+#include "model_coeffs/_models.h"
+
 namespace chromemedia {
 namespace codec {
 namespace {
@@ -36,8 +38,7 @@ class ResidualVectorQuantizerTest : public testing::TestWithParam<int> {
  protected:
   ResidualVectorQuantizerTest()
       : num_quantized_bits_(GetParam()),
-        quantizer_(ResidualVectorQuantizer::Create(
-            ghc::filesystem::current_path() / "lyra/model_coeffs")),
+        quantizer_(ResidualVectorQuantizer::Create(GetEmbeddedLyraModels())),
         // These features correspond to silence run through the
         // SoundStreamEncoder using the SoundStreamEncoderTest.
         features_{
@@ -70,7 +71,7 @@ class ResidualVectorQuantizerTest : public testing::TestWithParam<int> {
 };
 
 TEST_P(ResidualVectorQuantizerTest, CreationFailsWithInvalidModelPath) {
-  EXPECT_EQ(ResidualVectorQuantizer::Create("invalid/model/path"), nullptr);
+  EXPECT_EQ(ResidualVectorQuantizer::Create(GetInvalidEmbeddedLyraModels()), nullptr);
 }
 
 TEST_P(ResidualVectorQuantizerTest, CreationSucceedsWithValidModelPath) {

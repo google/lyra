@@ -35,7 +35,7 @@ class ResidualVectorQuantizer : public VectorQuantizerInterface {
  public:
   // Returns nullptr if the TFLite model can't be built or allocated.
   static std::unique_ptr<ResidualVectorQuantizer> Create(
-      const ghc::filesystem::path& model_path);
+      const LyraModels& models);
 
   // Quantizes the features using vector quantization.
   std::optional<std::string> Quantize(const std::vector<float>& features,

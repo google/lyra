@@ -34,12 +34,11 @@ namespace chromemedia {
 namespace codec {
 
 std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
-    const ghc::filesystem::path& model_file, bool use_xnn,
+    const LyraModel& model_file, bool use_xnn,
     bool int8_quantized) {
-  auto model = tflite::FlatBufferModel::BuildFromFile(model_file.c_str());
+  auto model = tflite::FlatBufferModel::BuildFromBuffer(model_file.buffer, model_file.size);
   if (model == nullptr) {
-    LOG(ERROR) << "Could not build TFLite FlatBufferModel for file: "
-               << model_file;
+    LOG(ERROR) << "Could not build TFLite FlatBufferModel";
     return nullptr;
   }
 
@@ -55,7 +54,7 @@ std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
 
   std::unique_ptr<tflite::Interpreter> interpreter;
   if (builder(&interpreter) != kTfLiteOk) {
-    LOG(ERROR) << "Could not build TFLite Interpreter for file: " << model_file;
+    LOG(ERROR) << "Could not build TFLite Interpreter";
     return nullptr;
   }
 
@@ -85,8 +84,7 @@ std::unique_ptr<TfLiteModelWrapper> TfLiteModelWrapper::Create(
   // End of XNNPack delegate creation.
 
   if (interpreter->AllocateTensors() != kTfLiteOk) {
-    LOG(ERROR) << "Could not allocate quantize TFLite tensors for file: "
-               << model_file;
+    LOG(ERROR) << "Could not allocate quantize TFLite tensors";
     return nullptr;
   }
 
