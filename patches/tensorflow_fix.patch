@@ -1,0 +1,21 @@
+From df9cf01f69c74ba650796903a2128f1e01c0e572 Mon Sep 17 00:00:00 2001
+From: Tom Bannink <tombannink@gmail.com>
+Date: Fri, 5 May 2023 09:22:21 +0200
+Subject: [PATCH] Add missing `stdint.h` include
+
+---
+ tensorflow/lite/kernels/internal/spectrogram.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tensorflow/lite/kernels/internal/spectrogram.cc b/tensorflow/lite/kernels/internal/spectrogram.cc
+index a832962a38df1b..919eebeb3e703c 100644
+--- a/tensorflow/lite/kernels/internal/spectrogram.cc
++++ b/tensorflow/lite/kernels/internal/spectrogram.cc
+@@ -17,6 +17,7 @@ limitations under the License.
+ 
+ #include <assert.h>
+ #include <math.h>
++#include <stdint.h>
+ 
+ #include "third_party/fft2d/fft.h"
+ 
