@@ -1,0 +1,74 @@
+diff --git a/.bazelrc b/.bazelrc
+--- a/.bazelrc
++++ b/.bazelrc
+@@ -98,6 +98,12 @@ build --define=grpc_no_ares=true
+ # Sets the default Apple platform to macOS.
+ build --apple_platform_type=macos
+ 
++# The zlib revision pulled through Protobuf predates current macOS SDK
++# configuration. Its Apple-specific fallback replaces fdopen before the SDK
++# declares it; an identity definition prevents that replacement.
++build:macos --copt=-Dfdopen=fdopen
++build:macos --host_copt=-Dfdopen=fdopen
++
+ build --experimental_repo_remote_exec
+ 
+ # Enable platform specific config (e.g. by default use --config=windows when on windows, and --config=linux when on linux)
+diff --git a/.bazelversion b/.bazelversion
+--- a/.bazelversion
++++ b/.bazelversion
+@@ -1 +1 @@
+-5.3.2
++6.6.0
+diff --git a/WORKSPACE b/WORKSPACE
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -93,7 +93,10 @@ http_archive(
+ git_repository(
+     name = "com_google_glog",
+     remote = "https://github.com/google/glog.git",
+-    branch = "master"
++    branch = "master",
++    repo_mapping = {
++        "@gflags": "@com_github_gflags_gflags",
++    },
+ )
+ # Dependency for glog
+ git_repository(
+@@ -107,10 +112,10 @@ git_repository(
+ http_archive(
+     name = "bazel_skylib",
+     urls = [
+-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
++        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.6.1/bazel-skylib-1.6.1.tar.gz",
++        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.6.1/bazel-skylib-1.6.1.tar.gz",
+     ],
+-    sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
++    sha256 = "9f38886a40548c6e96c106b752f242130ee11aaa068a56ba7e56f4511f33e4f2",
+ )
+ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+ bazel_skylib_workspace()
+@@ -170,7 +175,9 @@ git_repository(
+     remote = "https://github.com/tensorflow/tensorflow.git",
+     # Below is reproducible and equivalent to `tag = "v2.11.0"`
+     commit = "d5b57ca93e506df258271ea00fc29cf98383a374",
+-    shallow_since = "1668561432 -0800"
++    shallow_since = "1668561432 -0800",
++    patches = ["@//patches:tensorflow_lite_xcode26.diff"],
++    patch_args = ["-p1"],
+ )
+ 
+ # Check bazel version requirement, which is stricter than TensorFlow's.
+diff --git a/patches/tensorflow_lite_xcode26.diff b/patches/tensorflow_lite_xcode26.diff
+new file mode 100644
+--- /dev/null
++++ b/patches/tensorflow_lite_xcode26.diff
+@@ -0,0 +1,7 @@
++diff --git a/tensorflow/lite/kernels/elementwise.cc b/tensorflow/lite/kernels/elementwise.cc
++--- a/tensorflow/lite/kernels/elementwise.cc
+++++ b/tensorflow/lite/kernels/elementwise.cc
++@@ -230,1 +230,2 @@ TfLiteStatus AbsEval(TfLiteContext* context, TfLiteNode* node) {
++-      return EvalImpl<float>(context, node, std::abs<float>, type);
+++      return EvalImpl<float>(context, node,
+++                             [](float value) { return std::abs(value); }, type);
